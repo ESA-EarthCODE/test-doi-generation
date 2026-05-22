@@ -29,6 +29,10 @@ The system intelligently switches extraction logic based on whether it is a Prod
     - **Geolocations:** Converts `extent.spatial.bbox` into DataCite `geoLocationBox` objects.
     - **Related Identifiers:** Maps `links` (`cite-as`, `via`, `derived_from`, `git`) to DataCite `relatedIdentifiers`.
     - **Language:** Defaults to `en`.
+    - **Resource Types:** 
+        - **Products:** `Dataset`.
+        - **Workflows (Jupyter):** `ComputationalNotebook` (detected via `application:type`).
+        - **Workflows (Generic):** `Software`.
 
 #### Surgical File Updates
 To maintain formatting and standard compliance, the `sci:doi` and extension registration are placed differently:

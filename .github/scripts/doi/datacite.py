@@ -110,9 +110,22 @@ def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> 
     raw_type = properties.get("osc:type", stac_item.get("osc:type", "product"))
     stac_type = "product" if raw_type == "product" else "workflow"
     
-    resource_type = "Dataset" if stac_type == "product" else "Workflow"
     suffix = "/collection" if stac_type == "product" else "/record"
     path_segment = f"{stac_type}s"
+
+    # Resource Type Mapping
+    if stac_type == "product":
+        resource_type_general = "Dataset"
+        resource_type_name = "Dataset"
+    else:
+        # Detect specific workflow types
+        app_type = properties.get("application:type", "").lower()
+        if "jupyter-notebook" in app_type or "notebook" in app_type:
+            resource_type_general = "ComputationalNotebook"
+            resource_type_name = "Jupyter Notebook"
+        else:
+            resource_type_general = "Software"
+            resource_type_name = "Workflow"
 
     # Subjects (Keywords)
     subjects = []
@@ -176,8 +189,8 @@ def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> 
         "dates": dates,
         "language": "en",
         "types": {
-            "resourceTypeGeneral": resource_type,
-            "resourceType": resource_type
+            "resourceTypeGeneral": resource_type_general,
+            "resourceType": resource_type_name
         },
         "descriptions": [{"description": description, "descriptionType": "Abstract"}],
         "geoLocations": geolocations,
