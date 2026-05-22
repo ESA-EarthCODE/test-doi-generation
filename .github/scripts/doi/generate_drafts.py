@@ -2,6 +2,7 @@ import os
 import json
 import glob
 import sys
+import re
 
 # Add the current script's directory to sys.path to allow importing sibling modules
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -39,6 +40,18 @@ def main():
             try:
                 doi = client.create_draft_doi(metadata)
                 
+                # Detect indentation to preserve it
+                with open(file_path, 'r') as f:
+                    raw_content = f.read()
+                
+                # Simple indentation detection (count spaces on second line)
+                indent = 4
+                lines = raw_content.splitlines()
+                if len(lines) > 1:
+                    match = re.match(r'^(\s+)', lines[1])
+                    if match:
+                        indent = match.group(1)
+
                 # Update STAC item
                 stac_item["sci:doi"] = doi
                 
@@ -48,8 +61,9 @@ def main():
                     extensions.append(SCIENTIFIC_EXTENSION_URL)
                     stac_item["stac_extensions"] = extensions
                 
-                with open(file_path, 'w') as f:
-                    json.dump(stac_item, f, indent=4)
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(stac_item, f, indent=indent, ensure_ascii=False)
+                    f.write('\n') # Ensure trailing newline
                 
                 summary.append(f"- {file_path}: {doi} (Reason: {reason})")
                 modified_files.append(file_path)
