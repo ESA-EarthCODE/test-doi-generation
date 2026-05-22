@@ -69,42 +69,110 @@ class DataCiteClient:
         self.update_doi(doi, {"event": "publish", "url": target_url})
 
 def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> Dict[str, Any]:
-    """Maps STAC metadata to DataCite attributes."""
+    """Maps STAC metadata to DataCite attributes including recommended properties."""
     stac_id = stac_item.get("id")
     title = stac_item.get("title", stac_id)
     description = stac_item.get("description", "")
     created_at = stac_item.get("created")
-    publication_year = created_at[:4] if created_at else "2026" # Default to current year or fallback
+    updated_at = stac_item.get("updated")
+    publication_year = created_at[:4] if created_at else "2026"
     
-    # Extract creators/publishers from providers
+    # Extract creators/publishers/contributors from providers
     providers = stac_item.get("providers", [])
     creators = []
+    contributors = []
     publisher = "ESA Earthcode"
     
     for provider in providers:
         name = provider.get("name")
         roles = provider.get("roles", [])
+        # DataCite roles mapping
         if "producer" in roles:
-            creators.append({"name": name})
+            creators.append({"name": name, "nameType": "Organizational"})
         if "host" in roles:
             publisher = name
+        if any(r in roles for r in ["licensor", "processor", "contributor"]):
+            contributors.append({
+                "name": name, 
+                "nameType": "Organizational",
+                "contributorType": "DataCollector" if "processor" in roles else "Distributor"
+            })
 
     if not creators:
-        creators = [{"name": "ESA Earthcode"}]
+        creators = [{"name": "ESA Earthcode", "nameType": "Organizational"}]
 
-    resource_type = "Dataset" if stac_item.get("osc:type") == "product" else "Workflow"
+    stac_type = stac_item.get("osc:type", "product")
+    resource_type = "Dataset" if stac_type == "product" else "Workflow"
+    suffix = "/collection" if stac_type == "product" else "/record"
+    path_segment = f"{stac_type}s"
+
+    # Subjects (Keywords)
+    subjects = []
+    for kw in stac_item.get("keywords", []):
+        subjects.append({"subject": kw})
+
+    # Dates
+    dates = []
+    if created_at:
+        dates.append({"date": created_at, "dateType": "Created"})
+    if updated_at:
+        dates.append({"date": updated_at, "dateType": "Updated"})
+    
+    # Geolocations
+    geolocations = []
+    extent = stac_item.get("extent", {})
+    spatial = extent.get("spatial", {})
+    bboxes = spatial.get("bbox", [])
+    if bboxes and isinstance(bboxes[0], list):
+        for bbox in bboxes:
+            if len(bbox) >= 4:
+                geolocations.append({
+                    "geoLocationBox": {
+                        "westBoundLongitude": bbox[0],
+                        "southBoundLatitude": bbox[1],
+                        "eastBoundLongitude": bbox[2],
+                        "northBoundLatitude": bbox[3]
+                    }
+                })
+
+    # Related Identifiers (Links)
+    related_identifiers = []
+    for link in stac_item.get("links", []):
+        rel = link.get("rel")
+        href = link.get("href")
+        if rel in ["cite-as", "via", "derived_from"] and href:
+            # Try to detect if it's a DOI
+            if "doi.org/" in href:
+                doi_val = href.split("doi.org/")[-1]
+                related_identifiers.append({
+                    "relatedIdentifier": doi_val,
+                    "relatedIdentifierType": "DOI",
+                    "relationType": "IsDerivedFrom" if rel == "derived_from" else "IsDescribedBy"
+                })
+            else:
+                related_identifiers.append({
+                    "relatedIdentifier": href,
+                    "relatedIdentifierType": "URL",
+                    "relationType": "IsDerivedFrom" if rel == "derived_from" else "IsDescribedBy"
+                })
 
     attributes = {
         "titles": [{"title": title}],
         "creators": creators,
+        "contributors": contributors,
         "publisher": publisher,
         "publicationYear": int(publication_year),
+        "subjects": subjects,
+        "dates": dates,
+        "language": "en",
         "types": {
             "resourceTypeGeneral": resource_type,
             "resourceType": resource_type
         },
         "descriptions": [{"description": description, "descriptionType": "Abstract"}],
-        "url": f"{portal_ui_base_url}/{stac_item.get('osc:type', 'products')}s/{stac_id}"
+        "geoLocations": geolocations,
+        "relatedIdentifiers": related_identifiers,
+        "url": f"{portal_ui_base_url}/{path_segment}/{stac_id}{suffix}"
     }
     
     return attributes
