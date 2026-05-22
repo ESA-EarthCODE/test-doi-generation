@@ -37,7 +37,7 @@ jobs:
           DATACITE_PASSWORD: ${{ secrets.DATACITE_PASSWORD }}
           DATACITE_PREFIX: ${{ secrets.DATACITE_PREFIX }}
           PORTAL_UI_BASE_URL: ${{ vars.PORTAL_UI_BASE_URL || 'https://opensciencedata.esa.int' }}
-        run: python scripts/doi/generate_drafts.py
+        run: python .github/scripts/doi/generate_drafts.py
 
       - name: Read Summary
         id: summary
