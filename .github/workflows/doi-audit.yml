@@ -1,0 +1,70 @@
+name: DOI Audit
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'products/**/collection.json'
+      - 'workflows/**/collection.json'
+  # schedule:
+  #  - cron: '0 0 * * *' # Daily at midnight
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'esa-earthcode'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Important for git history analysis
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+
+      - name: Run DOI Draft Generation
+        env:
+          DATACITE_API_URL: ${{ secrets.DATACITE_API_URL || 'https://api.test.datacite.org' }}
+          DATACITE_USER: ${{ secrets.DATACITE_USER }}
+          DATACITE_PASSWORD: ${{ secrets.DATACITE_PASSWORD }}
+          DATACITE_PREFIX: ${{ secrets.DATACITE_PREFIX }}
+          PORTAL_UI_BASE_URL: ${{ vars.PORTAL_UI_BASE_URL || 'https://opensciencedata.esa.int' }}
+        run: python scripts/doi/generate_drafts.py
+
+      - name: Read Summary
+        id: summary
+        run: |
+          if [ -f doi_summary.md ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            # Prepare body for PR
+            {
+              echo "PR_BODY<<EOF"
+              cat doi_summary.md
+              echo "EOF"
+            } >> $GITHUB_ENV
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.summary.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: assign DOIs to products and workflows'
+          title: 'chore: assign DOIs'
+          body: ${{ env.PR_BODY }}
+          branch: bot/doi-updates
+          base: main
+          delete-branch: true
+          labels: |
+            doi-assignment
+            automated
