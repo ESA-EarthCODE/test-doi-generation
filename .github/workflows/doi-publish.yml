@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'products/**/collection.json'
-      - 'workflows/**/collection.json'
+      - 'workflows/**/record.json'
 
 jobs:
   publish:

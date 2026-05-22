@@ -55,7 +55,10 @@ def main():
     published_count = 0
 
     for file_path in files:
-        if file_path.endswith("collection.json") and ("products/" in file_path or "workflows/" in file_path):
+        is_product_file = file_path.endswith("collection.json") and "products/" in file_path
+        is_workflow_file = file_path.endswith("record.json") and "workflows/" in file_path
+        
+        if is_product_file or is_workflow_file:
             # Only publish if sci:doi was actually changed in this commit
             if not get_file_diff_in_last_commit(file_path):
                 print(f"Skipping {file_path}: sci:doi was not changed in this commit.")

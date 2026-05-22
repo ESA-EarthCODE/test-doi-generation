@@ -60,9 +60,9 @@ def main():
         print(f"Error: {e}")
         return
 
-    # Find all products and workflows collection files
+    # Find all products and workflows files
     files = glob.glob("products/**/collection.json", recursive=True) + \
-            glob.glob("workflows/**/collection.json", recursive=True)
+            glob.glob("workflows/**/record.json", recursive=True)
 
     summary = []
     modified_files = []

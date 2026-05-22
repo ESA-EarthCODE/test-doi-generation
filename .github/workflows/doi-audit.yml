@@ -6,7 +6,7 @@ on:
       - main
     paths:
       - 'products/**/collection.json'
-      - 'workflows/**/collection.json'
+      - 'workflows/**/record.json'
   # schedule:
   #  - cron: '0 0 * * *' # Daily at midnight
   workflow_dispatch:
@@ -71,7 +71,7 @@ jobs:
           delete-branch: true
           add-paths: |
             products/**/collection.json
-            workflows/**/collection.json
+            workflows/**/record.json
           labels: |
             doi-assignment
             automated
