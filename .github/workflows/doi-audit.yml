@@ -44,15 +44,16 @@ jobs:
         run: |
           if [ -f doi_summary.md ]; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
-            # Prepare body for PR
-            {
-              echo "PR_BODY<<EOF"
-              cat doi_summary.md
-              echo "EOF"
-            } >> $GITHUB_ENV
+            # Use a unique delimiter to avoid collisions and ensure a trailing newline
+            EOF=$(dd if=/dev/urandom bs=15 count=1 2>/dev/null | base64)
+            echo "PR_BODY<<$EOF" >> $GITHUB_ENV
+            cat doi_summary.md >> $GITHUB_ENV
+            echo "" >> $GITHUB_ENV
+            echo "$EOF" >> $GITHUB_ENV
           else
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
+
 
       - name: Create Pull Request
         if: steps.summary.outputs.has_changes == 'true'
