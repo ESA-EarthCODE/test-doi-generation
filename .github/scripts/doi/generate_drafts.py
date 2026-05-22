@@ -13,6 +13,46 @@ from check_changes import check_doi_need
 SCIENTIFIC_EXTENSION_URL = "https://stac-extensions.github.io/scientific/v1.0.0/schema.json"
 PORTAL_UI_BASE_URL = os.getenv("PORTAL_UI_BASE_URL", "https://opensciencedata.esa.int")
 
+def surgical_update(file_path: str, doi: str):
+    """Updates the STAC collection file using string manipulation to preserve formatting."""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    scientific_ext = "https://stac-extensions.github.io/scientific/v1.0.0/schema.json"
+    
+    # 1. Update/Insert sci:doi
+    if '"sci:doi"' in content:
+        # Update existing DOI value
+        content = re.sub(r'("sci:doi"\s*:\s*")[^"]+(")', rf'\1{doi}\2', content)
+    else:
+        # Insert sci:doi after the first { and its following newline
+        match = re.search(r'^(\s+)"', content, re.MULTILINE)
+        indent = match.group(1) if match else "  "
+        content = re.sub(r'^\{(\r?\n)', rf'{{\1{indent}"sci:doi": "{doi}",\1', content)
+
+    # 2. Update/Insert stac_extensions
+    if scientific_ext not in content:
+        if '"stac_extensions"' in content:
+            # Find the stac_extensions array and append the new extension
+            # This regex finds the array start and all content up to the closing ]
+            match = re.search(r'("stac_extensions"\s*:\s*\[[^\]]*)', content, re.DOTALL)
+            if match:
+                prefix = match.group(1).rstrip()
+                if prefix.strip().endswith('['):
+                    new_ext = f'"{scientific_ext}"'
+                else:
+                    new_ext = f', "{scientific_ext}"'
+                content = content.replace(match.group(1), prefix + new_ext)
+        else:
+            # Insert stac_extensions after the first { and its following newline
+            match = re.search(r'^(\s+)"', content, re.MULTILINE)
+            indent = match.group(1) if match else "  "
+            ext_entry = f'{indent}"stac_extensions": [\n{indent}{indent}"{scientific_ext}"\n{indent}],\n'
+            content = re.sub(r'^\{(\r?\n)', rf'{{\1{ext_entry}', content)
+
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(content)
+
 def main():
     try:
         client = DataCiteClient()
@@ -32,7 +72,7 @@ def main():
         if needs_doi:
             print(f"Generating DOI for {file_path} (Reason: {reason})")
             
-            with open(file_path, 'r') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 stac_item = json.load(f)
             
             # Map metadata and create draft DOI
@@ -40,30 +80,8 @@ def main():
             try:
                 doi = client.create_draft_doi(metadata)
                 
-                # Detect indentation to preserve it
-                with open(file_path, 'r') as f:
-                    raw_content = f.read()
-                
-                # Simple indentation detection (count spaces on second line)
-                indent = 4
-                lines = raw_content.splitlines()
-                if len(lines) > 1:
-                    match = re.match(r'^(\s+)', lines[1])
-                    if match:
-                        indent = match.group(1)
-
-                # Update STAC item
-                stac_item["sci:doi"] = doi
-                
-                # Ensure scientific extension is present
-                extensions = stac_item.get("stac_extensions", [])
-                if SCIENTIFIC_EXTENSION_URL not in extensions:
-                    extensions.append(SCIENTIFIC_EXTENSION_URL)
-                    stac_item["stac_extensions"] = extensions
-                
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    json.dump(stac_item, f, indent=indent, ensure_ascii=False)
-                    f.write('\n') # Ensure trailing newline
+                # Surgically update the file to preserve formatting
+                surgical_update(file_path, doi)
                 
                 summary.append(f"- {file_path}: {doi} (Reason: {reason})")
                 modified_files.append(file_path)
