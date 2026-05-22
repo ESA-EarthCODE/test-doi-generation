@@ -69,16 +69,20 @@ class DataCiteClient:
         self.update_doi(doi, {"event": "publish", "url": target_url})
 
 def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> Dict[str, Any]:
-    """Maps STAC metadata to DataCite attributes including recommended properties."""
+    """Maps STAC or OGC Record metadata to DataCite attributes including recommended properties."""
+    # OGC Records (often used for workflows) nest attributes in 'properties'
+    properties = stac_item.get("properties", stac_item)
     stac_id = stac_item.get("id")
-    title = stac_item.get("title", stac_id)
-    description = stac_item.get("description", "")
-    created_at = stac_item.get("created")
-    updated_at = stac_item.get("updated")
+    
+    # Extract from properties if available, fallback to top-level
+    title = properties.get("title", stac_item.get("title", stac_id))
+    description = properties.get("description", stac_item.get("description", ""))
+    created_at = properties.get("created", stac_item.get("created"))
+    updated_at = properties.get("updated", stac_item.get("updated"))
     publication_year = created_at[:4] if created_at else "2026"
     
     # Extract creators/publishers/contributors from providers
-    providers = stac_item.get("providers", [])
+    providers = properties.get("providers", stac_item.get("providers", []))
     creators = []
     contributors = []
     publisher = "ESA Earthcode"
@@ -101,14 +105,19 @@ def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> 
     if not creators:
         creators = [{"name": "ESA Earthcode", "nameType": "Organizational"}]
 
-    stac_type = stac_item.get("osc:type", "product")
+    # Determine type and URL structure
+    # OGC records might have type in properties
+    raw_type = properties.get("osc:type", stac_item.get("osc:type", "product"))
+    stac_type = "product" if raw_type == "product" else "workflow"
+    
     resource_type = "Dataset" if stac_type == "product" else "Workflow"
     suffix = "/collection" if stac_type == "product" else "/record"
     path_segment = f"{stac_type}s"
 
     # Subjects (Keywords)
     subjects = []
-    for kw in stac_item.get("keywords", []):
+    keywords = properties.get("keywords", stac_item.get("keywords", []))
+    for kw in keywords:
         subjects.append({"subject": kw})
 
     # Dates
@@ -120,7 +129,7 @@ def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> 
     
     # Geolocations
     geolocations = []
-    extent = stac_item.get("extent", {})
+    extent = properties.get("extent", stac_item.get("extent", {}))
     spatial = extent.get("spatial", {})
     bboxes = spatial.get("bbox", [])
     if bboxes and isinstance(bboxes[0], list):
@@ -137,10 +146,11 @@ def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> 
 
     # Related Identifiers (Links)
     related_identifiers = []
-    for link in stac_item.get("links", []):
+    links = stac_item.get("links", []) # Links are usually top-level in both STAC and OGC
+    for link in links:
         rel = link.get("rel")
         href = link.get("href")
-        if rel in ["cite-as", "via", "derived_from"] and href:
+        if rel in ["cite-as", "via", "derived_from", "git"] and href:
             # Try to detect if it's a DOI
             if "doi.org/" in href:
                 doi_val = href.split("doi.org/")[-1]
@@ -149,7 +159,7 @@ def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> 
                     "relatedIdentifierType": "DOI",
                     "relationType": "IsDerivedFrom" if rel == "derived_from" else "IsDescribedBy"
                 })
-            else:
+            elif href.startswith("http"):
                 related_identifiers.append({
                     "relatedIdentifier": href,
                     "relatedIdentifierType": "URL",

@@ -29,12 +29,15 @@ def get_last_doi_change_commit(file_path: str) -> Optional[str]:
 
 def is_significant_change(current: Dict[str, Any], historical: Dict[str, Any]) -> bool:
     """Checks if 'extent' or 'links' have significantly changed."""
-    # Simple deep equality check for these specific keys
-    if current.get("extent") != historical.get("extent"):
+    # Handle OGC Record structure where extent is in properties
+    curr_props = current.get("properties", current)
+    hist_props = historical.get("properties", historical)
+
+    # Check Extent
+    if curr_props.get("extent") != hist_props.get("extent"):
         return True
     
-    # For links, we might want to be more specific (ignore 'rel': 'self' or 'root' changes)
-    # but a full comparison of the links array is a good starting point.
+    # Check Links (Links are typically top-level in both)
     if current.get("links") != historical.get("links"):
         return True
         
@@ -54,10 +57,13 @@ def check_doi_need(file_path: str) -> Tuple[bool, Optional[str]]:
         except json.JSONDecodeError:
             return False, "Invalid JSON"
 
-    if current_data.get("osc:skip_doi") is True:
+    # Support nested properties for OGC Records
+    properties = current_data.get("properties", current_data)
+
+    if properties.get("osc:skip_doi") is True or current_data.get("osc:skip_doi") is True:
         return False, "Skipped via osc:skip_doi"
 
-    doi = current_data.get("sci:doi")
+    doi = properties.get("sci:doi") or current_data.get("sci:doi")
     if not doi:
         return True, "Missing sci:doi"
 

@@ -8,23 +8,38 @@ The system follows a **Research -> Strategy -> Execution** lifecycle, implemente
 
 ### 1. Detection Phase (The "Audit")
 The system identifies the need for a DOI if:
-- **New Item:** A STAC Collection in `products/` or `workflows/` lacks the `sci:doi` property.
+- **New Item:** A STAC Collection (`products/**/collection.json`) or OGC Record (`workflows/**/record.json`) lacks the `sci:doi` property.
 - **Significant Change:** An item has an existing `sci:doi`, but its `extent` or `links` have been modified since the DOI was last assigned.
-    - *Logic:* The system uses `git log -G '"sci:doi"'` to find the last commit that modified the DOI, retrieves the file state at that commit, and performs a deep comparison of the `extent` and `links` objects.
+    - *Logic:* The system uses `git log -G '"sci:doi"'` to find the last commit that modified the DOI, retrieves the file state at that commit, and performs a deep comparison of the `extent` and `links` objects (accounting for nested properties in Records).
+
 ### 2. Draft Creation
-When a need is detected, the system:
-1.  **Metadata Mapping:** Extracts rich metadata from STAC to populate DataCite properties:
+When a need is detected, the system performs a context-aware update based on the file type:
+
+#### Metadata Mapping & Extraction
+The system intelligently switches extraction logic based on whether it is a Product (STAC) or a Workflow (OGC Record):
+- **Products (STAC):** Metadata is extracted from the top-level JSON fields.
+- **Workflows (OGC Record):** Metadata (title, description, keywords, dates, etc.) is primarily extracted from the nested `properties` object.
+- **Common Mapping:**
     - **Titles:** From STAC `title`.
     - **Creators:** From `providers` with the `producer` role.
     - **Publisher:** From `providers` with the `host` role (defaults to "ESA Earthcode").
     - **Contributors:** From `providers` with roles like `licensor`, `processor`, or `contributor`.
-    - **Subjects:** All entries from the STAC `keywords` array.
+    - **Subjects:** All entries from the `keywords` array.
     - **Dates:** `created` (DateType: Created) and `updated` (DateType: Updated) timestamps.
     - **Geolocations:** Converts `extent.spatial.bbox` into DataCite `geoLocationBox` objects.
-    - **Related Identifiers:** Maps STAC `links` (`cite-as`, `via`, `derived_from`) to DataCite `relatedIdentifiers`, identifying both DOIs and URLs.
+    - **Related Identifiers:** Maps `links` (`cite-as`, `via`, `derived_from`, `git`) to DataCite `relatedIdentifiers`.
     - **Language:** Defaults to `en`.
-    - **Resource Type:** `Dataset` for products, `Workflow` for workflows.
-2.  **API Call:** Calls the DataCite API to create a **Draft DOI**.
+
+#### Surgical File Updates
+To maintain formatting and standard compliance, the `sci:doi` and extension registration are placed differently:
+- **Products (`collection.json`):** 
+    - `sci:doi` is placed at the top level.
+    - Extension URL is added to the `stac_extensions` array.
+- **Workflows (`record.json`):** 
+    - `sci:doi` is placed inside the `properties` block.
+    - Extension URL is added to the `conformsTo` array.
+- **Formatting Preservation:** All updates use string-insertion logic to preserve mixed indentation (2-space vs 4-space), UTF-8 characters (no escaping), and existing file structure.
+
 ...
 
 3. Updates the local `collection.json` with the new `sci:doi` and adds the `https://stac-extensions.github.io/scientific/v1.0.0/schema.json` extension.
