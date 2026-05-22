@@ -69,6 +69,9 @@ jobs:
           branch: bot/doi-updates
           base: main
           delete-branch: true
+          add-paths: |
+            products/**/collection.json
+            workflows/**/collection.json
           labels: |
             doi-assignment
             automated
