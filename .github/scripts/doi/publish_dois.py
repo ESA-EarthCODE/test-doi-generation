@@ -15,7 +15,7 @@ def get_modified_files_in_last_commit():
     """Returns a list of files modified in the last commit."""
     try:
         output = subprocess.check_output(
-            ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"],
+            ["git", "diff-tree", "-m", "--no-commit-id", "--name-only", "-r", "HEAD"],
             stderr=subprocess.DEVNULL
         ).decode("utf-8")
         return output.splitlines()
