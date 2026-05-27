@@ -53,11 +53,26 @@ def surgical_update(file_path: str, doi: str):
             match = re.search(rf'("{ext_key}"\s*:\s*\[[^\]]*)', content, re.DOTALL)
             if match:
                 prefix = match.group(1).rstrip()
+                
+                # Determine indentation for the new item
+                lines = prefix.split('\n')
+                item_indent = "    " # Default fallback
+                for line in reversed(lines):
+                    if line.strip() and not line.strip().endswith('['):
+                        m = re.match(r'^(\s*)', line)
+                        if m:
+                            item_indent = m.group(1)
+                            break
+                            
+                # Get the trailing whitespace to preserve closing bracket formatting
+                trailing_ws_match = re.search(r'(\s+)$', match.group(1))
+                trailing_ws = trailing_ws_match.group(1) if trailing_ws_match else "\n  "
+
                 if prefix.strip().endswith('['):
-                    new_ext = f'"{scientific_ext}"'
+                    new_ext = f'\n{item_indent}"{scientific_ext}"'
                 else:
-                    new_ext = f', "{scientific_ext}"'
-                content = content.replace(match.group(1), prefix + new_ext)
+                    new_ext = f',\n{item_indent}"{scientific_ext}"'
+                content = content.replace(match.group(1), prefix + new_ext + trailing_ws)
         else:
             # Insert extension key after the first {
             match = re.search(r'^(\s+)"', content, re.MULTILINE)
