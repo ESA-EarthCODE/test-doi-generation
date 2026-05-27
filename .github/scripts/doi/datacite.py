@@ -107,8 +107,8 @@ def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> 
 
     # Determine type and URL structure
     # OGC records might have type in properties
-    raw_type = properties.get("osc:type", stac_item.get("osc:type", "product"))
-    stac_type = "product" if raw_type == "product" else "workflow"
+    raw_type = properties.get("osc:type", stac_item.get("osc:type", properties.get("type", "product")))
+    stac_type = "workflow" if raw_type == "workflow" else "product"
     
     suffix = "/collection" if stac_type == "product" else "/record"
     path_segment = f"{stac_type}s"

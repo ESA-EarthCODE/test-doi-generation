@@ -25,11 +25,13 @@ def get_modified_files_in_last_commit():
 def extract_doi_from_file(file_path):
     """Extracts sci:doi from a JSON file."""
     if not os.path.exists(file_path):
-        return None
+        return None, None
     try:
         with open(file_path, 'r') as f:
             data = json.load(f)
-            return data.get("sci:doi"), data
+            properties = data.get("properties", data)
+            doi = properties.get("sci:doi") or data.get("sci:doi")
+            return doi, data
     except Exception:
         return None, None
 
@@ -70,7 +72,9 @@ def main():
                 try:
                     # Construct target URL
                     stac_id = stac_item.get("id")
-                    stac_type = stac_item.get("osc:type", "product")
+                    properties = stac_item.get("properties", stac_item)
+                    raw_type = properties.get("osc:type", stac_item.get("osc:type", properties.get("type", "product")))
+                    stac_type = "workflow" if raw_type == "workflow" else "product"
                     suffix = "/collection" if stac_type == "product" else "/record"
                     target_url = f"{PORTAL_UI_BASE_URL}/{stac_type}s/{stac_id}{suffix}"
                     
