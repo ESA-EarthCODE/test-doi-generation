@@ -100,24 +100,40 @@ def main():
     for file_path in files:
         needs_doi, reason = check_doi_need(file_path)
         if needs_doi:
-            print(f"Generating DOI for {file_path} (Reason: {reason})")
-            
             with open(file_path, 'r', encoding='utf-8') as f:
                 stac_item = json.load(f)
             
-            # Map metadata and create draft DOI
+            # Map metadata
             metadata = map_stac_to_datacite(stac_item, PORTAL_UI_BASE_URL)
-            try:
-                doi = client.create_draft_doi(metadata)
-                
-                # Surgically update the file to preserve formatting
-                surgical_update(file_path, doi)
-                
-                summary.append(f"- {file_path}: {doi} (Reason: {reason})")
-                modified_files.append(file_path)
-            except Exception as e:
-                print(f"Failed to create DOI for {file_path}: {e}")
-                summary.append(f"- {file_path}: FAILED ({e})")
+            
+            # Check if we should update or create
+            existing_doi = stac_item.get("properties", stac_item).get("sci:doi")
+            doi_to_use = None
+            action = "created"
+
+            if existing_doi:
+                state = client.get_doi_state(existing_doi)
+                if state == "draft":
+                    print(f"Updating existing draft DOI {existing_doi} for {file_path}")
+                    client.update_doi(existing_doi, metadata)
+                    doi_to_use = existing_doi
+                    action = "updated"
+                else:
+                    print(f"Existing DOI {existing_doi} is {state}. Creating a new version.")
+
+            if not doi_to_use:
+                print(f"Generating new DOI for {file_path} (Reason: {reason})")
+                try:
+                    doi_to_use = client.create_draft_doi(metadata)
+                    # Surgically update the file to preserve formatting
+                    surgical_update(file_path, doi_to_use)
+                except Exception as e:
+                    print(f"Failed to create DOI for {file_path}: {e}")
+                    summary.append(f"- {file_path}: FAILED ({e})")
+                    continue
+
+            summary.append(f"- {file_path}: {doi_to_use} ({action}, Reason: {reason})")
+            modified_files.append(file_path)
 
     if summary:
         print("\nDOI Generation Summary:")

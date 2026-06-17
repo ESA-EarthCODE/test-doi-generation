@@ -53,6 +53,17 @@ class DataCiteClient:
         result = self._request("POST", url, payload)
         return result["data"]["attributes"]["doi"]
 
+    def get_doi_state(self, doi: str) -> Optional[str]:
+        """Returns the state of the DOI (draft, findable, registered) or None if not found."""
+        url = f"{DATACITE_API_BASE_URL}/dois/{doi}"
+        try:
+            result = self._request("GET", url)
+            return result["data"]["attributes"]["state"]
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return None
+            raise
+
     def update_doi(self, doi: str, attributes: Dict[str, Any]) -> None:
         """Updates an existing DOI's attributes."""
         url = f"{DATACITE_API_BASE_URL}/dois/{doi}"
