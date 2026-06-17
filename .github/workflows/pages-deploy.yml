@@ -16,12 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c58112651d73b507a977e0d444f60e069a # v6.0.3
         with:
           fetch-depth: 0 # Full history needed for versioning
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8f0d950967957a1cf91831158747d16062 # v6.2.0
         with:
           python-version: '3.10'
 
@@ -29,7 +29,7 @@ jobs:
         run: python .github/scripts/doi/build_pages.py
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@fc324d3810b9735c7e6073a07624848c375819e1 # v5.0.0
         with:
           path: ./dist
 
@@ -39,7 +39,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    permissions:
+      pages: write
+      id-token: write
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@09bcf43d27307f022359189219ee93a9ef693af2 # v5.0.0
