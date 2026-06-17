@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Checkout (PR)
         if: github.event_name == 'pull_request_target'
-        uses: actions/checkout@df4cb1c58112651d73b507a977e0d444f60e069a # v6.0.3
+        uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
           token: ${{ secrets.BOT_PAT || secrets.GITHUB_TOKEN }}
           repository: ${{ github.event.pull_request.head.repo.full_name }}
@@ -28,7 +28,7 @@ jobs:
 
       - name: Checkout (Manual)
         if: github.event_name != 'pull_request_target'
-        uses: actions/checkout@df4cb1c58112651d73b507a977e0d444f60e069a # v6.0.3
+        uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
           fetch-depth: 0
 
@@ -38,7 +38,7 @@ jobs:
           git checkout origin/main -- .github/scripts/doi/
 
       - name: Set up Python
-        uses: actions/setup-python@a309ff8f0d950967957a1cf91831158747d16062 # v6.2.0
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.10'
 
@@ -57,7 +57,7 @@ jobs:
 
       - name: Commit changes to PR
         if: github.event_name == 'pull_request_target'
-        uses: stefanzweifel/git-auto-commit-action@04702ed07a3506c7b10e497d7c1ac3e8b6204472 # v7.1.0
+        uses: stefanzweifel/git-auto-commit-action@04702edda442b2e678b25b537cec683a1493fcb9 # v7.1.0
         with:
           commit_message: "chore: assign DOIs to products and workflows"
           file_pattern: 'products/**/collection.json workflows/**/record.json'
@@ -84,7 +84,7 @@ jobs:
 
       - name: Create Pull Request (Manual)
         if: github.event_name != 'pull_request_target' && steps.check_changes.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@5f6978faf08907096707041471c6843b25f797b4 # v8.1.1
+        uses: peter-evans/create-pull-request@5f6978faf08907d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: 'chore: assign DOIs to products and workflows'

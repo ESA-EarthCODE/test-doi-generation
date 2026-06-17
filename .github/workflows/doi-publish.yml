@@ -16,12 +16,12 @@ jobs:
     if: github.repository_owner == 'esa-earthcode'
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c58112651d73b507a977e0d444f60e069a # v6.0.3
+        uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
           fetch-depth: 2 # Need at least 2 commits to see diff if needed, though HEAD is usually enough for git diff-tree
 
       - name: Set up Python
-        uses: actions/setup-python@a309ff8f0d950967957a1cf91831158747d16062 # v6.2.0
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: '3.10'
 
