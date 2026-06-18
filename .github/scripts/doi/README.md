@@ -18,6 +18,7 @@ The system automatically identifies the need for a DOI or an update:
 To maintain a clean DataCite registry, the system distinguishes between drafts and published DOIs:
 - **Draft Updates:** If a file already has a DOI that is still in a `draft` state (e.g., during iterative PR reviews), the system **updates the existing DOI metadata** instead of creating a new one.
 - **Versioning:** If the existing DOI is already `findable` (published) and a significant change is detected, the system creates a **new Draft DOI** to represent the new version.
+- **Dangling Draft Cleanup:** If a Pull Request is closed *without* being merged, a dedicated workflow (`doi-cleanup.yml`) compares the PR's DOIs against the base branch. It safely deletes any unmerged, newly created Draft DOIs via the DataCite API, preventing registry clutter.
 
 ### 3. Publication Phase
 When a DOI assignment PR is merged into `main`:
@@ -36,11 +37,12 @@ On every push to `main`, the system builds a versioned static site:
 
 ## Components (Location: `.github/scripts/doi/`)
 
-- `datacite.py`: Low-level wrapper for DataCite REST API. Supports state detection and updates.
+- `datacite.py`: Low-level wrapper for DataCite REST API. Supports state detection, updates, and deletions.
 - `check_changes.py`: Git-based change detection logic.
 - `generate_drafts.py`: Main script for the detection phase; updates local files and manages draft DOIs.
 - `publish_dois.py`: Main script for the publication phase; finalizes DOIs on DataCite.
 - `build_pages.py`: Build script for the versioned GitHub Pages deployment.
+- `cleanup_drafts.py`: Target script for deleting abandoned drafts when a PR is closed.
 
 ## Configuration (GitHub Secrets)
 ...

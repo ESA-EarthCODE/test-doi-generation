@@ -46,6 +46,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
 
+      - name: Determine changed files (PR)
+        if: github.event_name == 'pull_request_target'
+        run: |
+          git remote add upstream https://github.com/${{ github.repository }}
+          git fetch upstream ${{ github.event.pull_request.base.ref }}
+          FILES=$(git diff --name-only upstream/${{ github.event.pull_request.base.ref }} HEAD | grep -E '(products/.*/collection\.json|workflows/.*/record\.json)' || true)
+          FILES_FLAT=$(echo $FILES | tr '\n' ' ')
+          echo "CHANGED_FILES=$FILES_FLAT" >> $GITHUB_ENV
+
       - name: Run DOI Draft Generation
         env:
           DATACITE_API_URL: ${{ secrets.DATACITE_API_URL || 'https://api.test.datacite.org' }}
@@ -53,6 +62,7 @@ jobs:
           DATACITE_PASSWORD: ${{ secrets.DATACITE_PASSWORD }}
           DATACITE_PREFIX: ${{ secrets.DATACITE_PREFIX }}
           PORTAL_UI_BASE_URL: ${{ vars.PORTAL_UI_BASE_URL || 'https://opensciencedata.esa.int' }}
+          CHANGED_FILES: ${{ env.CHANGED_FILES }}
         run: python .github/scripts/doi/generate_drafts.py
 
       - name: Commit changes to PR

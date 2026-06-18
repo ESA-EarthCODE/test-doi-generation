@@ -90,9 +90,18 @@ def main():
         print(f"Error: {e}")
         return
 
-    # Find all products and workflows files
-    files = glob.glob("products/**/collection.json", recursive=True) + \
-            glob.glob("workflows/**/record.json", recursive=True)
+    changed_files_env = os.environ.get("CHANGED_FILES")
+    
+    if changed_files_env is not None:
+        files = [f for f in changed_files_env.strip().split() if f]
+        if not files:
+            print("No relevant STAC Collections or OGC Records were modified in this PR. Skipping DOI generation.")
+            return
+        print(f"Running audit on modified files only: {files}")
+    else:
+        print("Running full repository audit...")
+        files = glob.glob("products/**/collection.json", recursive=True) + \
+                glob.glob("workflows/**/record.json", recursive=True)
 
     summary = []
     modified_files = []

@@ -75,6 +75,11 @@ class DataCiteClient:
         }
         self._request("PUT", url, payload)
 
+    def delete_doi(self, doi: str) -> None:
+        """Deletes a draft DOI."""
+        url = f"{DATACITE_API_BASE_URL}/dois/{doi}"
+        self._request("DELETE", url)
+
     def publish_doi(self, doi: str, target_url: str) -> None:
         """Transitions a DOI from Draft to Findable state."""
         self.update_doi(doi, {"event": "publish", "url": target_url})
@@ -135,7 +140,7 @@ def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> 
             resource_type_general = "ComputationalNotebook"
             resource_type_name = "Jupyter Notebook"
         else:
-            resource_type_general = "Software"
+            resource_type_general = "Workflow"
             resource_type_name = "Workflow"
 
     # Subjects (Keywords)
