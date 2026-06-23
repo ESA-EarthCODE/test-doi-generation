@@ -24,7 +24,7 @@ def surgical_update(file_path: str, doi: str):
     # 1. Update/Insert sci:doi
     if '"sci:doi"' in content:
         # Update existing DOI value
-        content = re.sub(r'("sci:doi"\s*:\s*")[^"]+(")', rf'\1{doi}\2', content)
+        content = re.sub(r'("sci:doi"\s*:\s*")[^"]+(")', r'\1' + doi + r'\2', content)
     else:
         if is_record and '"properties"' in content:
             # Insert sci:doi inside properties
@@ -33,17 +33,17 @@ def surgical_update(file_path: str, doi: str):
             if match:
                 prefix = match.group(1)
                 indent = match.group(3)
-                content = content.replace(prefix, f'{prefix}{indent}"sci:doi": "{doi}",\n')
+                content = content.replace(prefix, prefix + indent + f'"sci:doi": "{doi}",\n')
             else:
                 # Fallback: insert after {
                 match = re.search(r'^(\s+)"', content, re.MULTILINE)
                 indent = match.group(1) if match else "  "
-                content = re.sub(r'^\{(\r?\n)', rf'{{\1{indent}"sci:doi": "{doi}",\1', content)
+                content = re.sub(r'^\{(\r?\n)', r'{\1' + indent + f'"sci:doi": "{doi}",\n', content)
         else:
             # Insert sci:doi after the first { and its following newline
             match = re.search(r'^(\s+)"', content, re.MULTILINE)
             indent = match.group(1) if match else "  "
-            content = re.sub(r'^\{(\r?\n)', rf'{{\1{indent}"sci:doi": "{doi}",\1', content)
+            content = re.sub(r'^\{(\r?\n)', r'{\1' + indent + f'"sci:doi": "{doi}",\n', content)
 
     # 2. Update/Insert Extensions
     ext_key = "conformsTo" if is_record else "stac_extensions"

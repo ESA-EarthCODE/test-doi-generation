@@ -12,15 +12,26 @@ from datacite import DataCiteClient
 PORTAL_UI_BASE_URL = os.getenv("PORTAL_UI_BASE_URL", "https://opensciencedata.esa.int")
 
 def get_modified_files_in_last_commit():
-    """Returns a list of files modified in the last commit."""
+    """Returns a list of files modified in the last commit, handling merge commits correctly."""
     try:
+        # Check if it's a merge commit
+        subprocess.check_output(["git", "rev-parse", "--verify", "HEAD^2"], stderr=subprocess.DEVNULL)
+        # For a merge commit, this shows changes relative to the first parent (main)
         output = subprocess.check_output(
-            ["git", "diff-tree", "-m", "--no-commit-id", "--name-only", "-r", "HEAD"],
+            ["git", "diff", "--name-only", "HEAD^1", "HEAD"],
             stderr=subprocess.DEVNULL
         ).decode("utf-8")
         return output.splitlines()
     except Exception:
-        return []
+        # Fallback for non-merge commits or shallow clones
+        try:
+            output = subprocess.check_output(
+                ["git", "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"],
+                stderr=subprocess.DEVNULL
+            ).decode("utf-8")
+            return output.splitlines()
+        except Exception:
+            return []
 
 def extract_doi_from_file(file_path):
     """Extracts sci:doi from a JSON file."""
@@ -82,6 +93,7 @@ def main():
         return
 
     files = get_modified_files_in_last_commit()
+    print(f"Found {len(files)} modified files in this commit.")
     published_count = 0
 
     for file_path in files:
@@ -89,15 +101,16 @@ def main():
         is_workflow_file = file_path.endswith("record.json") and "workflows/" in file_path
         
         if is_product_file or is_workflow_file:
-            # Only publish if sci:doi was actually changed in this commit
-            if not get_file_diff_in_last_commit(file_path):
-                print(f"Skipping {file_path}: sci:doi was not changed in this commit.")
+            doi, stac_item = extract_doi_from_file(file_path)
+            if not doi:
+                print(f"Skipping {file_path}: No DOI found or invalid JSON.")
                 continue
 
-            doi, stac_item = extract_doi_from_file(file_path)
-            if doi:
-                print(f"Publishing DOI {doi} for {file_path}")
-                try:
+            # Check if it's a draft on DataCite
+            try:
+                state = client.get_doi_state(doi)
+                if state == "draft":
+                    print(f"Publishing DOI {doi} for {file_path} (State: {state})")
                     # Construct target URL
                     stac_id = stac_item.get("id")
                     properties = stac_item.get("properties", stac_item)
@@ -113,8 +126,10 @@ def main():
                     create_and_push_tag(stac_id, doi)
                     
                     published_count += 1
-                except Exception as e:
-                    print(f"Failed to publish {doi}: {e}")
+                else:
+                    print(f"Skipping {file_path}: DOI {doi} is already in state '{state}'.")
+            except Exception as e:
+                print(f"Failed to check or publish DOI {doi} for {file_path}: {e}")
 
     print(f"Finished. Published {published_count} DOIs.")
 

@@ -38,7 +38,34 @@ def get_file_at_commit(file_path: str, commit_hash: str) -> Optional[Dict[str, A
             stderr=subprocess.DEVNULL
         ).decode("utf-8")
         return json.loads(content)
-    except Exception:
+    except Exception as e:
+        print(f"Warning: Could not load {file_path} at commit {commit_hash}: {e}")
+        return None
+
+def safe_load_json(file_path: str) -> Optional[Dict[str, Any]]:
+    """Loads a JSON file with robust error handling."""
+    if not os.path.exists(file_path):
+        return None
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"ERROR: Failed to parse {file_path}: {e}")
+        # Print a snippet of the file around the error for debugging
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                start = max(0, e.lineno - 3)
+                end = min(len(lines), e.lineno + 2)
+                print("Context:")
+                for i in range(start, end):
+                    prefix = ">>" if i + 1 == e.lineno else "  "
+                    print(f"{prefix} {i+1}: {lines[i].strip()}")
+        except Exception:
+            pass
+        return None
+    except Exception as e:
+        print(f"ERROR: Unexpected error reading {file_path}: {e}")
         return None
 
 def is_local_path(href: str) -> bool:
@@ -56,8 +83,9 @@ def is_local_path(href: str) -> bool:
 def build_versioned_files(file_path: str, dist_dir: str):
     """Extracts historical versions based on Git tags and writes them to dist."""
     # Load current file to get ID
-    with open(file_path, 'r', encoding='utf-8') as f:
-        current_data = json.load(f)
+    current_data = safe_load_json(file_path)
+    if not current_data:
+        return
     
     properties = current_data.get("properties", current_data)
     stac_id = properties.get("id", current_data.get("id"))
