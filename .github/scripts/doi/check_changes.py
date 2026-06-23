@@ -18,12 +18,47 @@ def get_last_doi_change_commit(file_path: str) -> Optional[str]:
     """Finds the last commit hash where 'sci:doi' was modified in the file."""
     try:
         # -G looks for differences that have added or removed a match for the regex
-        # We look for the literal "sci:doi"
         output = subprocess.check_output(
             ["git", "log", "-G", '"sci:doi"', "--format=%H", "-n", "1", "--", file_path],
             stderr=subprocess.DEVNULL
         ).decode("utf-8").strip()
         return output if output else None
+    except Exception:
+        return None
+
+def get_last_version_tag_commit(stac_id: str) -> Optional[str]:
+    """Finds the commit hash of the latest version tag (<stac_id>-v*)."""
+    try:
+        # Get all tags for this ID, sorted by version number descending
+        output = subprocess.check_output(
+            ["git", "tag", "-l", f"{stac_id}-v*"],
+            stderr=subprocess.DEVNULL
+        ).decode("utf-8").splitlines()
+        
+        if not output:
+            return None
+            
+        # Parse versions and sort
+        tag_versions = []
+        for t in output:
+            try:
+                v = int(t.split("-v")[-1])
+                tag_versions.append((v, t))
+            except ValueError:
+                continue
+        
+        if not tag_versions:
+            return None
+            
+        latest_tag = sorted(tag_versions, reverse=True)[0][1]
+        
+        # Get commit SHA of the tag
+        commit = subprocess.check_output(
+            ["git", "rev-list", "-n", "1", latest_tag],
+            stderr=subprocess.DEVNULL
+        ).decode("utf-8").strip()
+        
+        return commit
     except Exception:
         return None
 
@@ -68,13 +103,25 @@ def check_doi_need(file_path: str) -> Tuple[bool, Optional[str]]:
         return True, "Missing sci:doi"
 
     # If DOI exists, check for significant changes since it was last set
-    last_commit = get_last_doi_change_commit(file_path)
+    stac_id = properties.get("id", current_data.get("id"))
+    
+    # Tiered fallback to find the historical baseline:
+    # 1. Latest official version tag (<id>-v*)
+    # 2. Last commit that modified the "sci:doi" string (for untagged existing DOIs)
+    # 3. The very first commit of the file
+    last_commit = get_last_version_tag_commit(stac_id)
     if not last_commit:
-        # If we can't find a commit that modified sci:doi (maybe it was added in the very first commit?)
-        # we'll assume it needs a check against the first commit of the file.
-        last_commit = subprocess.check_output(
-            ["git", "log", "--reverse", "--format=%H", "--", file_path]
-        ).decode("utf-8").splitlines()[0]
+        last_commit = get_last_doi_change_commit(file_path)
+    
+    if not last_commit:
+        # Final fallback: Assume current state is the validated baseline
+        # to avoid re-versioning legacy items that haven't been tagged yet.
+        try:
+            last_commit = subprocess.check_output(
+                ["git", "log", "-n", "1", "--format=%H", "--", file_path]
+            ).decode("utf-8").strip()
+        except Exception:
+            return False, "Could not determine file history"
 
     historical_data = get_file_at_commit(file_path, last_commit)
     if not historical_data:

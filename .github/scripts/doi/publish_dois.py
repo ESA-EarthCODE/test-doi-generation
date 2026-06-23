@@ -46,6 +46,34 @@ def get_file_diff_in_last_commit(file_path):
     except Exception:
         return True # Fallback to true if we can't check diff
 
+def create_and_push_tag(stac_id, doi):
+    """Creates a git tag for the version and pushes it to origin."""
+    try:
+        # Find the latest version tag for this item
+        tags = subprocess.check_output(
+            ["git", "tag", "-l", f"{stac_id}-v*"],
+            stderr=subprocess.DEVNULL
+        ).decode("utf-8").splitlines()
+        
+        versions = []
+        for t in tags:
+            try:
+                v = int(t.split("-v")[-1])
+                versions.append(v)
+            except ValueError:
+                continue
+        
+        next_version = max(versions) + 1 if versions else 1
+        tag_name = f"{stac_id}-v{next_version}"
+        
+        print(f"Creating tag {tag_name} for DOI {doi}")
+        subprocess.check_call(["git", "tag", "-a", tag_name, "-m", f"Published DOI: {doi}"])
+        subprocess.check_call(["git", "push", "origin", tag_name])
+        return tag_name
+    except Exception as e:
+        print(f"Failed to create/push tag for {stac_id}: {e}")
+        return None
+
 def main():
     try:
         client = DataCiteClient()
@@ -80,6 +108,10 @@ def main():
                     
                     client.publish_doi(doi, target_url)
                     print(f"Successfully published {doi}")
+                    
+                    # Create and push git tag
+                    create_and_push_tag(stac_id, doi)
+                    
                     published_count += 1
                 except Exception as e:
                     print(f"Failed to publish {doi}: {e}")

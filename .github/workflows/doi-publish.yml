@@ -12,13 +12,13 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     if: github.repository_owner == 'esa-earthcode'
     steps:
       - name: Checkout
         uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
-          fetch-depth: 2 # Need at least 2 commits to see diff if needed, though HEAD is usually enough for git diff-tree
+          fetch-depth: 0 # Need full history for tags
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0

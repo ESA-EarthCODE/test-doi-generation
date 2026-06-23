@@ -5,12 +5,17 @@ This directory contains the logic and automation for assigning [DataCite](https:
 ## Logic & Architecture
 
 The system follows a **Research -> Strategy -> Execution** lifecycle, implemented via an automated Pull Request workflow and a versioned deployment process.
-
 ### 1. Detection & Automation Phase
-The system automatically identifies the need for a DOI or an update:
+The system automatically identifies the need for a DOI or an update by comparing the current file state against its **official historical baseline**.
+
 - **New Item:** A STAC Collection (`products/**/collection.json`) or OGC Record (`workflows/**/record.json`) lacks the `sci:doi` property.
-- **Significant Change:** An item has an existing `sci:doi`, but its `extent` or `links` have been modified since the DOI was last assigned.
+- **Historical Baseline Detection:** For items with existing DOIs, the system searches for a baseline in this priority order:
+    1. **Version Tags:** The commit of the highest version tag (`<id>-v*`).
+    2. **String Match:** The last commit that modified the `"sci:doi"` string (fallback for untagged legacy items).
+    3. **Permissive Baseline:** If neither are found, the current state (`HEAD`) is assumed to be the validated baseline ("v1").
+- **Significant Change:** A new DOI draft is triggered if the `extent` or `links` fields have been modified relative to the detected baseline.
 - **Workflow Triggers:**
+...
     - **Pull Requests:** When a PR is opened or updated, the system automatically audits the changed files. If a DOI is needed, it generates/updates a draft and **auto-commits** the change back to the PR branch (handling forks via `pull_request_target`).
     - **Manual Audit:** Triggered via `workflow_dispatch`, it performs a global audit and creates a **new Pull Request** for any missing DOIs, providing a safety buffer for maintainers.
 
@@ -28,11 +33,12 @@ When a DOI assignment PR is merged into `main`:
 
 ### 4. Versioned GitHub Pages Deployment
 On every push to `main`, the system builds a versioned static site:
-- **History Extraction:** The system traverses Git history to extract every unique version of an item based on its DOI history.
-- **File Structure:** Versions are stored as `collection_v1.json`, `collection_v2.json`, etc., with `collection.json` always serving the latest state.
+- **Tag-Based History:** The system extracts historical versions strictly based on Git tags (`<item-id>-v*`).
+- **Recursive Item Versioning:** For every Collection version, the system identifies associated local STAC Items (via `rel: "item"` links) and saves snapshots of them at the exact same tagged commit.
+- **Link Rewriting:** Versioned Collections are updated to point to their corresponding versioned Items, ensuring a consistent point-in-time snapshot.
 - **Navigation Links:** Each JSON file is injected with STAC-compliant links for navigation:
-    - `latest-version`: Points to the main `collection.json`.
-    - `predecessor-version`: Points to the previous version.
+    - `latest-version`: Points to the main `collection.json` or `record.json`.
+    - `predecessor-version`: Points to the previous version (e.g., `_v1.json`).
     - `successor-version`: Points to the next version.
 
 ## Components (Location: `.github/scripts/doi/`)
@@ -63,7 +69,7 @@ The following secrets must be configured in the GitHub repository:
     1.  Manually edit the PR branch.
     2.  Revert the `sci:doi` field in the affected `collection.json` to its previous value (or remove it).
     3.  The publication workflow (`publish_dois.py`) is designed to be surgical: it performs a `git diff` and **only** publishes DOIs that were actually modified in the merge commit.
-- **Persistent State:** Once a PR is merged with a reverted or existing DOI, the audit logic recognizes that the file matches the state of the "last DOI change" and will not flag it again until a new significant change occurs.
+- **Persistent State:** Once a PR is merged and a version tag is created, the audit logic recognizes that the file matches the state of the "highest version tag" and will not flag it again until a new significant change occurs. For untagged legacy items, the system defaults to a **Permissive Baseline**, treating the current repository state as the initial validated version.
 
 ## File Formatting & Integrity
 
