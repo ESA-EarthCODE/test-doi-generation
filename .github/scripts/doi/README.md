@@ -50,17 +50,25 @@ On every push to `main`, the system builds a versioned static site:
 - `build_pages.py`: Build script for the versioned GitHub Pages deployment.
 - `cleanup_drafts.py`: Target script for deleting abandoned drafts when a PR is closed.
 
-## Configuration (GitHub Secrets)
-...
-The following secrets must be configured in the GitHub repository:
+## Configuration (GitHub Secrets & Variables)
 
-| Secret | Description |
-| :--- | :--- |
-| `DATACITE_USER` | DataCite Repository Account ID |
-| `DATACITE_PASSWORD` | DataCite Repository Password |
-| `DATACITE_PREFIX` | Assigned DOI Prefix |
-| `DATACITE_API_URL` | DataCite API Base URL |
-| `BOT_PAT` | (Optional) Personal Access Token for auto-committing to forks |
+The following configurations must be set in the GitHub repository for the workflows to function correctly:
+
+### Secrets
+| Secret | Description | Required |
+| :--- | :--- | :--- |
+| `DATACITE_USER` | DataCite Repository Account ID (e.g., `MYORG.REPO`) | **Yes** |
+| `DATACITE_PASSWORD` | DataCite Repository Password | **Yes** |
+| `DATACITE_PREFIX` | Assigned DOI Prefix (e.g., `10.xxxx`) | **Yes** |
+| `DATACITE_API_URL` | DataCite API Base URL (Defaults to `https://api.test.datacite.org`) | No |
+| `BOT_PAT` | Personal Access Token for auto-committing DOIs back to PRs from forks | No* |
+
+*\*Highly recommended for a smooth contributor experience.*
+
+### Variables
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `PORTAL_UI_BASE_URL` | Base URL for the Open Science Catalog UI. Used to construct the DOI target URL. | `https://opensciencedata.esa.int` |
 
 ## Metadata Overrides & Manual Control
 

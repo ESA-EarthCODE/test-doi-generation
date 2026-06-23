@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from datacite import DataCiteClient
 
-PORTAL_UI_BASE_URL = os.getenv("PORTAL_UI_BASE_URL", "https://catalog.earthcode.esa.int")
+PORTAL_UI_BASE_URL = os.getenv("PORTAL_UI_BASE_URL", "https://opensciencedata.esa.int")
 
 def get_modified_files_in_last_commit():
     """Returns a list of files modified in the last commit."""
