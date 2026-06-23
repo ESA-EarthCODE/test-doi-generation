@@ -1,5 +1,5 @@
 {
-  "sci:doi": "10.83678/r6gn-j427",
+  "sci:doi": "10.83678/hq6d-v941",
   "type": "Collection",
   "id": "polaris",
   "stac_version": "1.0.0",
@@ -91,7 +91,7 @@
   ],
   "osc:missions": [],
   "updated": "2025-02-19T23:00:00Z",
-  "title": "POLARIS update after publish",
+  "title": "POLARIS next doi change trigger",
   "extent": {
     "spatial": {
       "bbox": [
