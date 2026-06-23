@@ -1,17 +1,13 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
   workflow_run:
     workflows: ["DOI Publish"]
     types:
       - completed
   workflow_dispatch:
 
-# Ensure only one deployment runs at a time. 
-# If a new one starts (e.g. triggered by workflow_run), cancel any existing ones (e.g. triggered by push).
+# Ensure only one deployment runs at a time.
 concurrency:
   group: "pages-deploy"
   cancel-in-progress: true
@@ -24,6 +20,11 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Only run if the triggering workflow (DOI Publish) was successful, 
+    # OR if it was a manual trigger (event_name == 'workflow_dispatch').
+    if: >
+      github.event_name == 'workflow_dispatch' || 
+      (github.event.workflow_run.conclusion == 'success')
     steps:
       - name: Checkout
         uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
