@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - '*-v*'
   workflow_dispatch:
 
 permissions:
@@ -18,7 +20,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
-          fetch-depth: 0 # Full history needed for versioning
+          ref: main # Always build from main to get the full catalog
+          fetch-depth: 0 # Full history needed for versioning tags
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
