@@ -24,7 +24,8 @@ def surgical_update(file_path: str, doi: str):
     # 1. Update/Insert sci:doi
     if '"sci:doi"' in content:
         # Update existing DOI value
-        content = re.sub(r'("sci:doi"\s*:\s*")[^"]+(")', r'\1' + doi + r'\2', content)
+        # We use \g<1> and \g<2> to avoid ambiguity if the doi string starts with digits (e.g. \110 -> octal H)
+        content = re.sub(r'("sci:doi"\s*:\s*")[^"]+(")', r'\g<1>' + doi + r'\g<2>', content)
     else:
         if is_record and '"properties"' in content:
             # Insert sci:doi inside properties
@@ -38,12 +39,12 @@ def surgical_update(file_path: str, doi: str):
                 # Fallback: insert after {
                 match = re.search(r'^(\s+)"', content, re.MULTILINE)
                 indent = match.group(1) if match else "  "
-                content = re.sub(r'^\{(\r?\n)', r'{\1' + indent + f'"sci:doi": "{doi}",\n', content)
+                content = re.sub(r'^\{(\r?\n)', r'{\g<1>' + indent + f'"sci:doi": "{doi}",\n', content)
         else:
             # Insert sci:doi after the first { and its following newline
             match = re.search(r'^(\s+)"', content, re.MULTILINE)
             indent = match.group(1) if match else "  "
-            content = re.sub(r'^\{(\r?\n)', r'{\1' + indent + f'"sci:doi": "{doi}",\n', content)
+            content = re.sub(r'^\{(\r?\n)', r'{\g<1>' + indent + f'"sci:doi": "{doi}",\n', content)
 
     # 2. Update/Insert Extensions
     ext_key = "conformsTo" if is_record else "stac_extensions"
@@ -78,7 +79,7 @@ def surgical_update(file_path: str, doi: str):
             match = re.search(r'^(\s+)"', content, re.MULTILINE)
             indent = match.group(1) if match else "  "
             ext_entry = f'{indent}"{ext_key}": [\n{indent}{indent}"{scientific_ext}"\n{indent}],\n'
-            content = re.sub(r'^\{(\r?\n)', rf'{{\1{ext_entry}', content)
+            content = re.sub(r'^\{(\r?\n)', r'{\g<1>' + ext_entry, content)
 
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(content)
