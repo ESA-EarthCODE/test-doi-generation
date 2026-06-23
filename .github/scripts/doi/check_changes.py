@@ -63,17 +63,26 @@ def get_last_version_tag_commit(stac_id: str) -> Optional[str]:
         return None
 
 def is_significant_change(current: Dict[str, Any], historical: Dict[str, Any]) -> bool:
-    """Checks if 'extent' or 'links' have significantly changed."""
-    # Handle OGC Record structure where extent is in properties
+    """
+    Checks if metadata fields relevant to DataCite have changed.
+    Includes title, description, keywords, providers, extent, and links.
+    """
+    # Handle OGC Record structure where most fields are in properties
     curr_props = current.get("properties", current)
     hist_props = historical.get("properties", historical)
 
-    # Check Extent
-    if curr_props.get("extent") != hist_props.get("extent"):
+    # Fields that might be in 'properties' (Workflows) or top-level (Products)
+    fields_to_check = ["title", "description", "keywords", "providers", "extent"]
+    
+    for field in fields_to_check:
+        if curr_props.get(field) != hist_props.get(field):
+            return True
+    
+    # Check Links (typically top-level in both, but we check both just in case)
+    if current.get("links") != historical.get("links"):
         return True
     
-    # Check Links (Links are typically top-level in both)
-    if current.get("links") != historical.get("links"):
+    if curr_props.get("links") != hist_props.get("links"):
         return True
         
     return False
