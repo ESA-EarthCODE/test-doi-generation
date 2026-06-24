@@ -13,7 +13,7 @@ The system automatically identifies the need for a DOI or an update by comparing
     1. **Version Tags:** The commit of the highest version tag (`<id>-v*`).
     2. **String Match:** The last commit that modified the `"sci:doi"` string (fallback for untagged legacy items).
     3. **Permissive Baseline:** If neither are found, the current state (`HEAD`) is assumed to be the validated baseline ("v1").
-- **Significant Change:** A new DOI draft is triggered if the `extent` or `links` fields have been modified relative to the detected baseline.
+- **Significant Change:** A new DOI draft is triggered if any of the following fields have been modified relative to the detected baseline: `title`, `description`, `keywords`, `providers`, `extent`, or `links`.
 - **Workflow Triggers:**
 ...
     - **Pull Requests:** When a PR is opened or updated, the system automatically audits the changed files. If a DOI is needed, it generates/updates a draft and **auto-commits** the change back to the PR branch (handling forks via `pull_request_target`).
