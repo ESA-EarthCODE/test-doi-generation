@@ -93,13 +93,15 @@ def build_versioned_files(file_path: str, dist_dir: str):
         return
 
     tags = get_tags_for_item(stac_id)
+    num_versions = len(tags)
+    latest_v_num = tags[-1][0] if tags else 0
+    
     if not tags:
         print(f"No tags found for {stac_id}, skipping history.")
         # We still want to copy the latest version though
-        copy_latest(file_path, dist_dir, current_data, 0)
+        copy_latest(file_path, dist_dir, current_data, 0, 0)
         return
 
-    num_versions = len(tags)
     target_subdir = os.path.dirname(os.path.join(dist_dir, file_path))
     os.makedirs(target_subdir, exist_ok=True)
     filename = os.path.basename(file_path) # e.g., collection.json
@@ -111,17 +113,23 @@ def build_versioned_files(file_path: str, dist_dir: str):
             continue
         
         # Version and link STAC Items if they exist
-        data = version_items(data, file_path, commit_sha, v_num, target_subdir)
+        data = version_items(data, file_path, commit_sha, v_num, target_subdir, latest_v_num)
         
         v_filename = f"{base_name}_v{v_num}{ext}"
         
         # Inject navigation links
         links = data.get("links", [])
-        links.append({"rel": "latest-version", "href": filename, "type": "application/json", "title": "Latest version"})
-        if v_num > 1:
-            links.append({"rel": "predecessor-version", "href": f"{base_name}_v{v_num-1}{ext}", "type": "application/json", "title": "Predecessor"})
-        if v_num < num_versions:
-            links.append({"rel": "successor-version", "href": f"{base_name}_v{v_num+1}{ext}", "type": "application/json", "title": "Successor"})
+        
+        # Latest version link should point to the actual latest versioned file
+        if v_num < latest_v_num:
+            links.append({"rel": "latest-version", "href": f"{base_name}_v{latest_v_num}{ext}", "type": "application/json", "title": "Latest version"})
+        
+        if i > 0:
+            prev_v_num = tags[i-1][0]
+            links.append({"rel": "predecessor-version", "href": f"{base_name}_v{prev_v_num}{ext}", "type": "application/json", "title": "Predecessor"})
+        if i < num_versions - 1:
+            next_v_num = tags[i+1][0]
+            links.append({"rel": "successor-version", "href": f"{base_name}_v{next_v_num}{ext}", "type": "application/json", "title": "Successor"})
         
         data["links"] = links
         
@@ -129,9 +137,10 @@ def build_versioned_files(file_path: str, dist_dir: str):
             json.dump(data, f, indent=2)
 
     # Copy latest
-    copy_latest(file_path, dist_dir, current_data, num_versions)
+    prev_v_num = tags[-2][0] if num_versions > 1 else None
+    copy_latest(file_path, dist_dir, current_data, num_versions, latest_v_num, prev_v_num)
 
-def version_items(collection_data: Dict[str, Any], collection_path: str, commit_sha: str, v_num: str, target_subdir: str) -> Dict[str, Any]:
+def version_items(collection_data: Dict[str, Any], collection_path: str, commit_sha: str, v_num: int, target_subdir: str, latest_v_num: int) -> Dict[str, Any]:
     """Finds 'item' links, versions the items at the commit_sha, and updates links."""
     links = collection_data.get("links", [])
     new_links = []
@@ -156,7 +165,8 @@ def version_items(collection_data: Dict[str, Any], collection_path: str, commit_
                     
                     # Inject navigation into item too
                     item_links = item_data.get("links", [])
-                    item_links.append({"rel": "latest-version", "href": item_basename, "type": "application/json", "title": "Latest version"})
+                    if v_num < latest_v_num:
+                        item_links.append({"rel": "latest-version", "href": f"{item_name}_v{latest_v_num}{item_ext}", "type": "application/json", "title": "Latest version"})
                     item_data["links"] = item_links
 
                     with open(os.path.join(target_subdir, v_item_name), 'w', encoding='utf-8') as f:
@@ -170,7 +180,7 @@ def version_items(collection_data: Dict[str, Any], collection_path: str, commit_
     collection_data["links"] = new_links
     return collection_data
 
-def copy_latest(file_path: str, dist_dir: str, data: Dict[str, Any], num_versions: int):
+def copy_latest(file_path: str, dist_dir: str, data: Dict[str, Any], num_versions: int, latest_v_num: int, prev_v_num: Optional[int]):
     """Copies the latest version of the collection and its items to dist."""
     target_subdir = os.path.dirname(os.path.join(dist_dir, file_path))
     os.makedirs(target_subdir, exist_ok=True)
@@ -189,9 +199,10 @@ def copy_latest(file_path: str, dist_dir: str, data: Dict[str, Any], num_version
                     shutil.copy(item_path, os.path.join(target_subdir, os.path.basename(item_path)))
 
     # Inject navigation links into the latest version
-    links.append({"rel": "latest-version", "href": filename, "type": "application/json", "title": "Latest version"})
-    if num_versions > 0:
-         links.append({"rel": "predecessor-version", "href": f"{base_name}_v{num_versions}{ext}", "type": "application/json", "title": "Predecessor"})
+    # NO latest-version link for the latest version itself
+    if prev_v_num is not None:
+         links.append({"rel": "predecessor-version", "href": f"{base_name}_v{prev_v_num}{ext}", "type": "application/json", "title": "Predecessor"})
+    
     data["links"] = links
     
     with open(os.path.join(target_subdir, filename), 'w', encoding='utf-8') as f:

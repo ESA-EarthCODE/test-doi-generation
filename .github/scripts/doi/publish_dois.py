@@ -57,8 +57,8 @@ def get_file_diff_in_last_commit(file_path):
     except Exception:
         return True # Fallback to true if we can't check diff
 
-def create_and_push_tag(stac_id, doi):
-    """Creates a git tag for the version and pushes it to origin."""
+def get_next_version(stac_id):
+    """Calculates the next version number based on existing git tags."""
     try:
         # Find the latest version tag for this item
         tags = subprocess.check_output(
@@ -74,8 +74,15 @@ def create_and_push_tag(stac_id, doi):
             except ValueError:
                 continue
         
-        next_version = max(versions) + 1 if versions else 1
-        tag_name = f"{stac_id}-v{next_version}"
+        return max(versions) + 1 if versions else 1
+    except Exception as e:
+        print(f"Error calculating next version for {stac_id}: {e}")
+        return 1
+
+def create_and_push_tag(stac_id, version, doi):
+    """Creates a git tag for the version and pushes it to origin."""
+    try:
+        tag_name = f"{stac_id}-v{version}"
         
         print(f"Creating tag {tag_name} for DOI {doi}")
         subprocess.check_call(["git", "tag", "-a", tag_name, "-m", f"Published DOI: {doi}"])
@@ -111,19 +118,21 @@ def main():
                 state = client.get_doi_state(doi)
                 if state == "draft":
                     print(f"Publishing DOI {doi} for {file_path} (State: {state})")
-                    # Construct target URL
+                    # Construct target URL with version suffix
                     stac_id = stac_item.get("id")
                     properties = stac_item.get("properties", stac_item)
                     raw_type = properties.get("osc:type", stac_item.get("osc:type", properties.get("type", "product")))
                     stac_type = "workflow" if raw_type == "workflow" else "product"
                     suffix = "/collection" if stac_type == "product" else "/record"
-                    target_url = f"{PORTAL_UI_BASE_URL}/{stac_type}s/{stac_id}{suffix}"
+                    
+                    next_version = get_next_version(stac_id)
+                    target_url = f"{PORTAL_UI_BASE_URL}/{stac_type}s/{stac_id}{suffix}_v{next_version}"
                     
                     client.publish_doi(doi, target_url)
-                    print(f"Successfully published {doi}")
+                    print(f"Successfully published {doi} with target URL: {target_url}")
                     
                     # Create and push git tag
-                    create_and_push_tag(stac_id, doi)
+                    create_and_push_tag(stac_id, next_version, doi)
                     
                     published_count += 1
                 else:
