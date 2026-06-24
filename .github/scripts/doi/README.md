@@ -85,16 +85,10 @@ The following configurations must be set in the GitHub repository for the workfl
 
 ## Metadata Overrides & Manual Control
 
-- **Skip DOI:** To prevent an item from receiving a DOI, add `"osc:skip_doi": true` to its `collection.json`.
+- **Skip DOI:** To prevent an item from receiving a DOI, add `"osc:skip_doi": true` to its `collection.json` or `record.json`.
 - **Manual Reverts (The "Veto"):** If the automated PR proposes a DOI update that is not desired (e.g., a false positive or an insignificant change):
-    1.  Manually edit the PR branch.
-    2.  Revert the `sci:doi` field in the affected `collection.json` to its previous value (or remove it).
-    3.  The publication workflow (`publish_dois.py`) is designed to be surgical: it performs a `git diff` and **only** publishes DOIs that were actually modified in the merge commit.
-- **Persistent State:** Once a PR is merged and a version tag is created, the audit logic recognizes that the file matches the state of the "highest version tag" and will not flag it again until a new significant change occurs. For untagged legacy items, the system defaults to a **Permissive Baseline**, treating the current repository state as the initial validated version.
-
-## File Formatting & Integrity
-
-The system is designed to be "invisible" in your git history:
-- **Indentation:** The scripts automatically detect and preserve the existing indentation (2 spaces, 4 spaces, or tabs) of each `collection.json`.
-- **Encoding:** Files are handled as UTF-8. Special characters (e.g., `°`, `²`) are preserved as literals and are **not** escaped (e.g., no `\u00b0`).
-- **Trailing Newlines:** Standard POSIX trailing newlines are enforced to prevent linting errors and git diff noise.
+    1.  Manually edit the PR branch and revert the `sci:doi` field to its previous value (or remove it if it was new).
+    2.  The publication workflow (`publish_dois.py`) only publishes DOIs that are present and modified in the merge commit. Reverting the field ensures no DOI action is taken.
+    3.  **Baseline Note:** Since the historical baseline is driven by **Git Tags** (`<id>-v*`), a vetoed item will be flagged again by the next audit if the significant changes remain. To stop future audits from flagging the item, you must either revert the significant changes, accept the DOI, or use `osc:skip_doi`.
+- **Version Tags as Baselines:** The baseline for change detection only advances when a new version tag is created. This happens automatically when a new DOI is published. If you need to "approve" a metadata state as the new baseline *without* updating the DOI, you would need to manually create and push a new version tag for that item.
+- **Persistent State:** For untagged legacy items, the system defaults to a **Permissive Baseline**, treating the current repository state as the initial validated version.
