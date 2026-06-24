@@ -1,5 +1,5 @@
 {
-  "sci:doi": "10.83678/jym7-ab74",
+  "sci:doi": "10.83678/9tbs-3s36",
   "type": "Collection",
   "id": "polaris",
   "stac_version": "1.0.0",
@@ -91,7 +91,7 @@
   ],
   "osc:missions": [],
   "updated": "2025-02-19T23:00:00Z",
-  "title": "POLARIS doi change 3",
+  "title": "POLARIS doi change 4",
   "extent": {
     "spatial": {
       "bbox": [
