@@ -99,7 +99,7 @@ def build_versioned_files(file_path: str, dist_dir: str):
     if not tags:
         print(f"No tags found for {stac_id}, skipping history.")
         # We still want to copy the latest version though
-        copy_latest(file_path, dist_dir, current_data, 0, 0)
+        copy_latest(file_path, dist_dir, current_data, 0, 0, None)
         return
 
     target_subdir = os.path.dirname(os.path.join(dist_dir, file_path))
