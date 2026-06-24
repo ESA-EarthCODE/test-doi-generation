@@ -37,9 +37,22 @@ On every push to `main`, the system builds a versioned static site:
 - **Recursive Item Versioning:** For every Collection version, the system identifies associated local STAC Items (via `rel: "item"` links) and saves snapshots of them at the exact same tagged commit.
 - **Link Rewriting:** Versioned Collections are updated to point to their corresponding versioned Items, ensuring a consistent point-in-time snapshot.
 - **Navigation Links:** Each JSON file is injected with STAC-compliant links for navigation:
-    - `latest-version`: Points to the main `collection.json` or `record.json`.
-    - `predecessor-version`: Points to the previous version (e.g., `_v1.json`).
+    - `latest-version`: Points to the explicitly versioned file of the latest release (e.g., `collection_v3.json`). This link is omitted if the file is currently the latest version.
+    - `predecessor-version`: Points to the previous version (e.g., `collection_v1.json`).
     - `successor-version`: Points to the next version.
+
+## DataCite Metadata Mapping
+
+The system automatically extracts provider information from your STAC/OGC metadata to populate DataCite fields. This logic relies on the STAC Provider `roles` array:
+
+- **Creator (Mandatory, 1+):** Extracted from any provider with the `producer` role. 
+  - *Fallback:* If no producer is found, it defaults to `"ESA EarthCODE"`.
+  - *Note:* Mapped as `nameType: "Organizational"`.
+- **Publisher (Mandatory, exactly 1):** Extracted from the provider with the `host` role. 
+  - *Conflict Resolution:* If multiple providers have the `host` role, the **last** one listed in the file is used, as DataCite strictly requires a single publisher.
+  - *Fallback:* If no host is found, it defaults to `"ESA EarthCODE"`.
+- **Contributor (Optional):** Extracted from providers with `licensor`, `processor`, or `contributor` roles.
+  - *Note:* `processor` providers are mapped as `DataCollector`, while `licensor` or `contributor` providers are mapped as `Distributor`.
 
 ## Components (Location: `.github/scripts/doi/`)
 
