@@ -111,6 +111,11 @@ def check_doi_need(file_path: str) -> Tuple[bool, Optional[str]]:
     if not doi:
         return True, "Missing sci:doi"
 
+    # Check if it's a foreign DOI (not matching our prefix)
+    prefix = os.environ.get("DATACITE_PREFIX")
+    if prefix and not doi.startswith(prefix):
+        return True, f"Foreign DOI detected ({doi})"
+
     # If DOI exists, check for significant changes since it was last set
     stac_id = properties.get("id", current_data.get("id"))
     

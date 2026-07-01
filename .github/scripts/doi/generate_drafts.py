@@ -20,8 +20,44 @@ def surgical_update(file_path: str, doi: str):
 
     scientific_ext = "https://stac-extensions.github.io/scientific/v1.0.0/schema.json"
     is_record = file_path.endswith("record.json")
-    
-    # 1. Update/Insert sci:doi
+    prefix = os.environ.get("DATACITE_PREFIX")
+
+    # 1. Handle Foreign DOI Migration
+    if prefix and '"sci:doi"' in content:
+        doi_match = re.search(r'"sci:doi"\s*:\s*"([^"]+)"', content)
+        if doi_match:
+            existing_val = doi_match.group(1)
+            # If the current DOI is foreign (doesn't match our prefix)
+            if not existing_val.startswith(prefix):
+                print(f"Migrating foreign DOI {existing_val} to sci:publications")
+                # Avoid adding it again if it's already there
+                if f'"{existing_val}"' not in content or '"sci:publications"' not in content:
+                    if '"sci:publications"' in content:
+                        # Append to existing sci:publications array
+                        pub_match = re.search(r'("sci:publications"\s*:\s*\[[^\]]*)', content, re.DOTALL)
+                        if pub_match:
+                            prefix_content = pub_match.group(1)
+                            # Determine indentation
+                            lines = prefix_content.split('\n')
+                            indent = "    "
+                            for line in reversed(lines):
+                                if line.strip() and not line.strip().endswith('['):
+                                    m = re.match(r'^(\s*)', line)
+                                    if m:
+                                        indent = m.group(1)
+                                        break
+                            
+                            sep = "," if not prefix_content.strip().endswith("[") else ""
+                            new_pub = f'{sep}\n{indent}{{"doi": "{existing_val}"}}'
+                            content = content.replace(prefix_content, prefix_content + new_pub)
+                    else:
+                        # Create sci:publications array after the first {
+                        match = re.search(r'^(\s+)"', content, re.MULTILINE)
+                        indent = match.group(1) if match else "  "
+                        pub_entry = f'{indent}"sci:publications": [\n{indent}{indent}{{"doi": "{existing_val}"}}\n{indent}],\n'
+                        content = re.sub(r'^\{(\r?\n)', r'{\g<1>' + pub_entry, content)
+
+    # 2. Update/Insert sci:doi
     if '"sci:doi"' in content:
         # Update existing DOI value
         # We use \g<1> and \g<2> to avoid ambiguity if the doi string starts with digits (e.g. \110 -> octal H)

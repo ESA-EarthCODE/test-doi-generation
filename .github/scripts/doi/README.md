@@ -23,6 +23,7 @@ The system automatically identifies the need for a DOI or an update by comparing
 To maintain a clean DataCite registry, the system distinguishes between drafts and published DOIs:
 - **Draft Updates:** If a file already has a DOI that is still in a `draft` state (e.g., during iterative PR reviews), the system **updates the existing DOI metadata** instead of creating a new one.
 - **Versioning:** If the existing DOI is already `findable` (published) and a significant change is detected, the system creates a **new Draft DOI** to represent the new version.
+- **Foreign DOI Migration:** If an item has an existing `sci:doi` from an external source (not matching the configured `DATACITE_PREFIX`), the system will replace it with a new local DOI. The old foreign DOI is automatically moved to the `sci:publications` array to preserve the reference.
 - **Dangling Draft Cleanup:** If a Pull Request is closed *without* being merged, a dedicated workflow (`doi-cleanup.yml`) compares the PR's DOIs against the base branch. It safely deletes any unmerged, newly created Draft DOIs via the DataCite API, preventing registry clutter.
 
 ### 3. Publication Phase
