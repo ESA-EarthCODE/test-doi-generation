@@ -75,10 +75,10 @@ def get_next_version(stac_id, stac_type):
             if match:
                 versions.append(int(match.group(1)))
         
-        return max(versions) + 1 if versions else 2
+        return max(versions) + 1 if versions else 1
     except Exception as e:
         print(f"Error calculating next version for {stac_id}: {e}")
-        return 2
+        return 1
 
 def create_and_push_tag(stac_id, stac_type, version, doi):
     """Creates a git tag for the version and pushes it to origin."""
