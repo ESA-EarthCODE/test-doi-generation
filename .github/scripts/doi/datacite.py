@@ -114,13 +114,12 @@ def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> 
         roles = provider.get("roles", [])
         # DataCite roles mapping
         if "producer" in roles:
-            creators.append({"name": name, "nameType": "Organizational"})
+            creators.append({"name": name})
         if "host" in roles:
             publisher = name
         if any(r in roles for r in ["licensor", "processor", "contributor"]):
             contributors.append({
                 "name": name, 
-                "nameType": "Organizational",
                 "contributorType": "DataCollector" if "processor" in roles else "Distributor"
             })
 
