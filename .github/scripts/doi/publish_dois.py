@@ -57,32 +57,33 @@ def get_file_diff_in_last_commit(file_path):
     except Exception:
         return True # Fallback to true if we can't check diff
 
-def get_next_version(stac_id):
-    """Calculates the next version number based on existing git tags."""
+def get_next_version(stac_id, stac_type):
+    """Calculates the next version number based on existing git tags, using type prefixes to avoid collisions."""
     try:
-        # Find the latest version tag for this item
+        tag_prefix = f"{stac_type}-{stac_id}"
+        # Find all tags starting with the prefix
         tags = subprocess.check_output(
-            ["git", "tag", "-l", f"{stac_id}-v*"],
+            ["git", "tag", "-l", f"{tag_prefix}-v*"],
             stderr=subprocess.DEVNULL
         ).decode("utf-8").splitlines()
         
         versions = []
         for t in tags:
-            try:
-                v = int(t.split("-v")[-1])
-                versions.append(v)
-            except ValueError:
-                continue
+            # Strictly ensure we only parse tags that match exactly <prefix>-v<number>
+            # This prevents a tag like 'product-4dmed-2d-alt-varnet-v1' from matching 'product-4dmed-2d-alt'
+            match = re.match(rf"^{re.escape(tag_prefix)}-v(\d+)$", t)
+            if match:
+                versions.append(int(match.group(1)))
         
-        return max(versions) + 1 if versions else 1
+        return max(versions) + 1 if versions else 2
     except Exception as e:
         print(f"Error calculating next version for {stac_id}: {e}")
-        return 1
+        return 2
 
-def create_and_push_tag(stac_id, version, doi):
+def create_and_push_tag(stac_id, stac_type, version, doi):
     """Creates a git tag for the version and pushes it to origin."""
     try:
-        tag_name = f"{stac_id}-v{version}"
+        tag_name = f"{stac_type}-{stac_id}-v{version}"
         
         print(f"Creating tag {tag_name} for DOI {doi}")
         subprocess.check_call(["git", "tag", "-a", tag_name, "-m", f"Published DOI: {doi}"])
@@ -125,14 +126,14 @@ def main():
                     stac_type = "workflow" if raw_type == "workflow" else "product"
                     suffix = "/collection" if stac_type == "product" else "/record"
                     
-                    next_version = get_next_version(stac_id)
+                    next_version = get_next_version(stac_id, stac_type)
                     target_url = f"{PORTAL_UI_BASE_URL}/{stac_type}s/{stac_id}{suffix}_v{next_version}"
                     
                     client.publish_doi(doi, target_url)
                     print(f"Successfully published {doi} with target URL: {target_url}")
                     
                     # Create and push git tag
-                    create_and_push_tag(stac_id, next_version, doi)
+                    create_and_push_tag(stac_id, stac_type, next_version, doi)
                     
                     published_count += 1
                 else:

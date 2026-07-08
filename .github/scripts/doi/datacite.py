@@ -10,6 +10,13 @@ DATACITE_USER = os.getenv("DATACITE_USER")
 DATACITE_PASSWORD = os.getenv("DATACITE_PASSWORD")
 DATACITE_PREFIX = os.getenv("DATACITE_PREFIX")
 
+class DataCiteError(Exception):
+    """Custom exception for DataCite API errors, including the response body."""
+    def __init__(self, code: int, body: str):
+        self.code = code
+        self.body = body
+        super().__init__(f"DataCite API Error {code}: {body}")
+
 class DataCiteClient:
     def __init__(self):
         if not all([DATACITE_USER, DATACITE_PASSWORD, DATACITE_PREFIX]):
@@ -34,8 +41,7 @@ class DataCiteClient:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             error_body = e.read().decode("utf-8")
-            print(f"HTTP Error {e.code}: {error_body}")
-            raise
+            raise DataCiteError(e.code, error_body) from e
 
     def create_draft_doi(self, metadata: Dict[str, Any]) -> str:
         """Creates a Draft DOI and returns the DOI string."""
@@ -59,7 +65,7 @@ class DataCiteClient:
         try:
             result = self._request("GET", url)
             return result["data"]["attributes"]["state"]
-        except urllib.error.HTTPError as e:
+        except DataCiteError as e:
             if e.code == 404:
                 return None
             raise

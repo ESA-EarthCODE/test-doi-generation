@@ -8,6 +8,8 @@ on:
       - 'products/**/collection.json'
       - 'workflows/**/record.json'
   workflow_dispatch:
+  # schedule:
+  #   - cron: '0 0 * * *' # Daily at midnight
 
 jobs:
   audit:
@@ -26,10 +28,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
 
-      - name: Checkout (Manual)
+      - name: Checkout (Scheduled/Manual)
         if: github.event_name != 'pull_request_target'
         uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
+          token: ${{ secrets.BOT_PAT || secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Ensure trusted scripts
@@ -75,7 +78,7 @@ jobs:
           commit_user_email: "github-actions[bot]@users.noreply.github.com"
           commit_author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
 
-      - name: Check for changes (Manual)
+      - name: Check for changes (Scheduled/Manual)
         if: github.event_name != 'pull_request_target'
         id: check_changes
         run: |
@@ -92,13 +95,13 @@ jobs:
             echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Create Pull Request (Manual)
+      - name: Create Pull Request (Scheduled/Manual)
         if: github.event_name != 'pull_request_target' && steps.check_changes.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.BOT_PAT || secrets.GITHUB_TOKEN }}
           commit-message: 'chore: assign DOIs to products and workflows'
-          title: 'chore: assign DOIs (Manual Audit)'
+          title: 'chore: assign DOIs (Full Audit)'
           body: ${{ env.PR_BODY || 'Automated DOI assignment for missing or modified items.' }}
           branch: bot/doi-updates
           base: main

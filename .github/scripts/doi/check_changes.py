@@ -26,26 +26,30 @@ def get_last_doi_change_commit(file_path: str) -> Optional[str]:
     except Exception:
         return None
 
-def get_last_version_tag_commit(stac_id: str) -> Optional[str]:
-    """Finds the commit hash of the latest version tag (<stac_id>-v*)."""
+def get_last_version_tag_commit(stac_id: str, stac_type: str) -> Optional[str]:
+    """Finds the commit hash of the latest version tag (<stac_type>-<stac_id>-v*)."""
+    import re
     try:
+        tag_prefix = f"{stac_type}-{stac_id}"
         # Get all tags for this ID, sorted by version number descending
         output = subprocess.check_output(
-            ["git", "tag", "-l", f"{stac_id}-v*"],
+            ["git", "tag", "-l", f"{tag_prefix}-v*"],
             stderr=subprocess.DEVNULL
         ).decode("utf-8").splitlines()
-        
+            
         if not output:
             return None
             
         # Parse versions and sort
         tag_versions = []
         for t in output:
-            try:
-                v = int(t.split("-v")[-1])
-                tag_versions.append((v, t))
-            except ValueError:
-                continue
+            match = re.match(rf"^{re.escape(tag_prefix)}-v(\d+)$", t)
+            if match:
+                try:
+                    v = int(match.group(1))
+                    tag_versions.append((v, t))
+                except ValueError:
+                    continue
         
         if not tag_versions:
             return None
@@ -118,12 +122,14 @@ def check_doi_need(file_path: str) -> Tuple[bool, Optional[str]]:
 
     # If DOI exists, check for significant changes since it was last set
     stac_id = properties.get("id", current_data.get("id"))
+    raw_type = properties.get("osc:type", current_data.get("osc:type", properties.get("type", "product")))
+    stac_type = "workflow" if raw_type == "workflow" else "product"
     
     # Tiered fallback to find the historical baseline:
-    # 1. Latest official version tag (<id>-v*)
+    # 1. Latest official version tag (<stac_type>-<id>-v*)
     # 2. Last commit that modified the "sci:doi" string (for untagged existing DOIs)
     # 3. The very first commit of the file
-    last_commit = get_last_version_tag_commit(stac_id)
+    last_commit = get_last_version_tag_commit(stac_id, stac_type)
     if not last_commit:
         last_commit = get_last_doi_change_commit(file_path)
     

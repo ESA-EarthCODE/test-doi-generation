@@ -5,26 +5,30 @@ import subprocess
 import shutil
 from typing import List, Dict, Any, Optional, Tuple
 
-def get_tags_for_item(stac_id: str) -> List[Tuple[int, str, str]]:
+def get_tags_for_item(stac_id: str, stac_type: str) -> List[Tuple[int, str, str]]:
     """Returns a list of (version, tag_name, commit_sha) for an item, sorted by version."""
     try:
+        tag_prefix = f"{stac_type}-{stac_id}"
         output = subprocess.check_output(
-            ["git", "tag", "-l", f"{stac_id}-v*"],
+            ["git", "tag", "-l", f"{tag_prefix}-v*"],
             stderr=subprocess.DEVNULL
         ).decode("utf-8").splitlines()
         
         tag_list = []
         for t in output:
-            try:
-                v = int(t.split("-v")[-1])
-                # Get commit SHA of the tag
-                commit = subprocess.check_output(
-                    ["git", "rev-list", "-n", "1", t],
-                    stderr=subprocess.DEVNULL
-                ).decode("utf-8").strip()
-                tag_list.append((v, t, commit))
-            except (ValueError, subprocess.CalledProcessError):
-                continue
+            import re
+            match = re.match(rf"^{re.escape(tag_prefix)}-v(\d+)$", t)
+            if match:
+                try:
+                    v = int(match.group(1))
+                    # Get commit SHA of the tag
+                    commit = subprocess.check_output(
+                        ["git", "rev-list", "-n", "1", t],
+                        stderr=subprocess.DEVNULL
+                    ).decode("utf-8").strip()
+                    tag_list.append((v, t, commit))
+                except (ValueError, subprocess.CalledProcessError):
+                    continue
         
         return sorted(tag_list)
     except Exception:
@@ -91,8 +95,11 @@ def build_versioned_files(file_path: str, dist_dir: str):
     stac_id = properties.get("id", current_data.get("id"))
     if not stac_id:
         return
+        
+    raw_type = properties.get("osc:type", current_data.get("osc:type", properties.get("type", "product")))
+    stac_type = "workflow" if raw_type == "workflow" else "product"
 
-    tags = get_tags_for_item(stac_id)
+    tags = get_tags_for_item(stac_id, stac_type)
     num_versions = len(tags)
     latest_v_num = tags[-1][0] if tags else 0
     
@@ -208,15 +215,37 @@ def copy_latest(file_path: str, dist_dir: str, data: Dict[str, Any], num_version
     with open(os.path.join(target_subdir, filename), 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
 
+def copy_directory(src_dir: str, dest_dir: str):
+    """Copies an entire directory if it exists."""
+    if os.path.exists(src_dir):
+        shutil.copytree(src_dir, os.path.join(dest_dir, src_dir), dirs_exist_ok=True)
+
+def copy_file(src_file: str, dest_dir: str):
+    """Copies a file if it exists, creating parent directories if needed."""
+    if os.path.exists(src_file):
+        dest_file = os.path.join(dest_dir, src_file)
+        os.makedirs(os.path.dirname(dest_file), exist_ok=True)
+        shutil.copy(src_file, dest_file)
+
 def main():
     dist_dir = "dist"
     if os.path.exists(dist_dir):
         shutil.rmtree(dist_dir)
     os.makedirs(dist_dir)
 
+    # 1. Copy root files
     if os.path.exists("catalog.json"):
         shutil.copy("catalog.json", os.path.join(dist_dir, "catalog.json"))
 
+    # 2. Copy supplementary directories
+    for d in ["eo-missions", "experiments", "projects", "themes", "variables"]:
+        copy_directory(d, dist_dir)
+        
+    # 3. Copy intermediate catalog files for products and workflows
+    copy_file("products/catalog.json", dist_dir)
+    copy_file("workflows/catalog.json", dist_dir)
+
+    # 4. Version and build the main collections/records
     files = glob.glob("products/**/collection.json", recursive=True) + \
             glob.glob("workflows/**/record.json", recursive=True)
 
