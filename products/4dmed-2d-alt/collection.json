@@ -1,5 +1,8 @@
 {
-    "sci:doi": "10.83678/x4nb-2815",
+    "sci:publications": [
+        {"doi": "10.5281/zenodo.15705049"}
+    ],
+    "sci:doi": "10.83678/3fkt-g459",
     "type": "Collection",
     "id": "4dmed-2d-alt",
     "stac_version": "1.0.0",
