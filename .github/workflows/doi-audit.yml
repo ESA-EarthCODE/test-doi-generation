@@ -2,6 +2,7 @@ name: DOI Audit
 
 on:
   pull_request_target:
+    types: [opened, synchronize, reopened, edited]
     branches:
       - main
     paths:

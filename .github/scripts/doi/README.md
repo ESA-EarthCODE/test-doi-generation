@@ -4,43 +4,42 @@ This directory contains the logic and automation for assigning [DataCite](https:
 
 ## Logic & Architecture
 
-The system follows a **Research -> Strategy -> Execution** lifecycle, implemented via an automated Pull Request workflow and a versioned deployment process.
-### 1. Detection & Automation Phase
-The system automatically identifies the need for a DOI or an update by comparing the current file state against its **official historical baseline**.
+The system supports a **Canonical DOI** for the root endpoint and **Versioned DOIs** for specific snapshots. It follows a **Research -> Strategy -> Execution** lifecycle, implemented via an automated Pull Request workflow and a versioned deployment process.
 
-- **New Item:** A STAC Collection (`products/**/collection.json`) or OGC Record (`workflows/**/record.json`) lacks the `sci:doi` property.
-- **Historical Baseline Detection:** For items with existing DOIs, the system searches for a baseline in this priority order:
-    1. **Version Tags:** The commit of the highest version tag (`<stac_type>-<id>-v*`). By prefixing with `product-` or `workflow-`, the system prevents namespace collisions between identically named items.
-    2. **String Match:** The last commit that modified the `"sci:doi"` string (fallback for untagged legacy items).
-    3. **Permissive Baseline:** If neither are found, the current state (`HEAD`) is assumed to be the validated baseline ("v1").
-- **Significant Change:** A new DOI draft is triggered if any of the following fields have been modified relative to the detected baseline: `title`, `description`, `keywords`, `providers`, `extent`, or `links`.
-- **Workflow Triggers:**
-...
-    - **Pull Requests:** When a PR is opened or updated, the system automatically audits the changed files. If a DOI is needed, it generates/updates a draft and **auto-commits** the change back to the PR branch (handling forks via `pull_request_target`).
-    - **Scheduled/Manual Audit:** Triggered daily via a `schedule` or manually via `workflow_dispatch`, it performs a **full repository audit**. It creates a **new Pull Request** containing all items requiring a new or updated DOI, providing a safety buffer for maintainers.
+### 1. Detection & Automation Phase
+The system identifies the need for a new Canonical DOI or a metadata update.
+
+- **Canonical DOI:** A STAC Collection (`products/**/collection.json`) or OGC Record (`workflows/**/record.json`) lacks the `sci:doi` property. This DOI points to the root endpoint (e.g., `/products/4dmed-2d-alt/collection`).
+- **Versioned DOI:** A new DOI version is only created if explicitly requested by a Data Steward.
+- **Requesting a New Version:** To generate a new DOI version, the Data Steward must check the following box in the Pull Request body:
+    - `[x] Request new DOI version`
+- **Significant Change & Metadata Updates:**
+    - If changes are detected in fields like `title`, `description`, `keywords`, `providers`, `extent`, or `links`, but **no new version is requested**, the system will **update the metadata** of the existing Canonical DOI and the latest versioned DOI on DataCite.
+    - If a new version **is** requested, the system generates a new Draft DOI and adds it to the `sci:publications` array.
 
 ### 2. Intelligent DOI Management
-To maintain a clean DataCite registry, the system distinguishes between drafts and published DOIs:
-- **Draft Updates:** If a file already has a DOI that is still in a `draft` state (e.g., during iterative PR reviews), the system **updates the existing DOI metadata** instead of creating a new one.
-- **Versioning:** If the existing DOI is already `findable` (published) and a significant change is detected, the system creates a **new Draft DOI** to represent the new version.
-- **Foreign DOI Migration:** If an item has an existing `sci:doi` from an external source (not matching the configured `DATACITE_PREFIX`), the system will replace it with a new local DOI. The old foreign DOI is automatically moved to the `sci:publications` array to preserve the reference.
-- **Dangling Draft Cleanup:** If a Pull Request is closed *without* being merged, a dedicated workflow (`doi-cleanup.yml`) compares the PR's DOIs against the base branch. It safely deletes any unmerged, newly created Draft DOIs via the DataCite API, preventing registry clutter.
+- **Canonical Storage:** The Canonical DOI is stored in the `sci:doi` field.
+- **Version Storage:** Versioned DOIs are stored in the `sci:publications` array as objects: `{"doi": "10.xxxx/version-doi"}`.
+- **Draft Updates:** If a DOI is still in a `draft` state (e.g., during PR review), the system updates its metadata instead of creating a new one.
+- **DataCite Relationships:** 
+    - The **Canonical DOI** is automatically updated to include `HasVersion` relationships pointing to all published versions.
+    - Each **Versioned DOI** includes an `IsVersionOf` relationship pointing back to the Canonical DOI.
+- **Foreign DOI Migration:** If an item has an existing `sci:doi` from an external source, it is moved to `sci:publications`, and a new local Canonical DOI is assigned to `sci:doi`.
 
 ### 3. Publication Phase
-When a DOI assignment PR is merged into `main`:
-1. The system identifies the newly added/modified DOIs.
-2. It calls the DataCite API to transition these DOIs from `Draft` to `Findable` (Published).
-3. It sets the DOI's target URL to the corresponding item page in the Portal UI.
+When a PR is merged into `main`:
+1. The system identifies new/modified DOIs in `sci:doi` and `sci:publications`.
+2. Draft DOIs are transitioned to `Findable` (Published).
+3. **Target URLs**:
+    - Canonical DOI -> `/products/{id}/collection`
+    - Version DOI -> `/products/{id}/collection_v{n}`
+4. A Git tag (`product-<id>-v{n}`) is created for the new version.
 
 ### 4. Versioned GitHub Pages Deployment
-On every push to `main`, the system builds a versioned static site:
-- **Tag-Based History:** The system extracts historical versions strictly based on Git tags (`<stac_type>-<item-id>-v*`).
-- **Recursive Item Versioning:** For every Collection version, the system identifies associated local STAC Items (via `rel: "item"` links) and saves snapshots of them at the exact same tagged commit.
-- **Link Rewriting:** Versioned Collections are updated to point to their corresponding versioned Items, ensuring a consistent point-in-time snapshot.
-- **Navigation Links:** Each JSON file is injected with STAC-compliant links for navigation:
-    - `latest-version`: Points to the explicitly versioned file of the latest release (e.g., `collection_v3.json`). This link is omitted if the file is currently the latest version.
-    - `predecessor-version`: Points to the previous version (e.g., `collection_v1.json`).
-    - `successor-version`: Points to the next version.
+On every push to `main`, the system builds a versioned static site in the `dist/` directory:
+- **Canonical File (`collection.json`)**: Contains links to all versions (`HasVersion`), the latest versioned snapshot (`latest-version`), and the DataCite history (`version-history`).
+- **Versioned Files (`collection_vN.json`)**: Contain links to the canonical root (`IsVersionOf`), predecessor/successor versions, and DataCite metadata.
+- **Recursive Item Versioning:** Associated local STAC Items are snapshotted at the corresponding tag and linked from the versioned collection.
 
 ## DataCite Metadata Mapping
 

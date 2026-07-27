@@ -90,7 +90,7 @@ class DataCiteClient:
         """Transitions a DOI from Draft to Findable state."""
         self.update_doi(doi, {"event": "publish", "url": target_url})
 
-def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> Dict[str, Any]:
+def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str, extra_related_identifiers: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """Maps STAC or OGC Record metadata to DataCite attributes including recommended properties."""
     # OGC Records (often used for workflows) nest attributes in 'properties'
     properties = stac_item.get("properties", stac_item)
@@ -180,6 +180,9 @@ def map_stac_to_datacite(stac_item: Dict[str, Any], portal_ui_base_url: str) -> 
 
     # Related Identifiers (Links)
     related_identifiers = []
+    if extra_related_identifiers:
+        related_identifiers.extend(extra_related_identifiers)
+    
     links = stac_item.get("links", []) # Links are usually top-level in both STAC and OGC
     for link in links:
         rel = link.get("rel")

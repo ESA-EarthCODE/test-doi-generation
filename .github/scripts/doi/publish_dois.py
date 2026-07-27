@@ -103,43 +103,76 @@ def main():
     files = get_modified_files_in_last_commit()
     print(f"Found {len(files)} modified files in this commit.")
     published_count = 0
+    prefix = os.environ.get("DATACITE_PREFIX")
 
     for file_path in files:
         is_product_file = file_path.endswith("collection.json") and "products/" in file_path
         is_workflow_file = file_path.endswith("record.json") and "workflows/" in file_path
         
         if is_product_file or is_workflow_file:
-            doi, stac_item = extract_doi_from_file(file_path)
-            if not doi:
-                print(f"Skipping {file_path}: No DOI found or invalid JSON.")
+            canonical_doi, stac_item = extract_doi_from_file(file_path)
+            if not canonical_doi:
+                print(f"Skipping {file_path}: No canonical DOI found.")
                 continue
 
-            # Check if it's a draft on DataCite
+            stac_id = stac_item.get("id")
+            properties = stac_item.get("properties", stac_item)
+            raw_type = properties.get("osc:type", stac_item.get("osc:type", properties.get("type", "product")))
+            stac_type = "workflow" if raw_type == "workflow" else "product"
+            suffix = "/collection" if stac_type == "product" else "/record"
+
+            # 1. Handle Canonical DOI
             try:
-                state = client.get_doi_state(doi)
+                state = client.get_doi_state(canonical_doi)
                 if state == "draft":
-                    print(f"Publishing DOI {doi} for {file_path} (State: {state})")
-                    # Construct target URL with version suffix
-                    stac_id = stac_item.get("id")
-                    properties = stac_item.get("properties", stac_item)
-                    raw_type = properties.get("osc:type", stac_item.get("osc:type", properties.get("type", "product")))
-                    stac_type = "workflow" if raw_type == "workflow" else "product"
-                    suffix = "/collection" if stac_type == "product" else "/record"
-                    
-                    next_version = get_next_version(stac_id, stac_type)
-                    target_url = f"{PORTAL_UI_BASE_URL}/{stac_type}s/{stac_id}{suffix}_v{next_version}"
-                    
-                    client.publish_doi(doi, target_url)
-                    print(f"Successfully published {doi} with target URL: {target_url}")
-                    
-                    # Create and push git tag
-                    create_and_push_tag(stac_id, stac_type, next_version, doi)
-                    
+                    print(f"Publishing Canonical DOI {canonical_doi} for {file_path}")
+                    target_url = f"{PORTAL_UI_BASE_URL}/{stac_type}s/{stac_id}{suffix}"
+                    client.publish_doi(canonical_doi, target_url)
                     published_count += 1
-                else:
-                    print(f"Skipping {file_path}: DOI {doi} is already in state '{state}'.")
             except Exception as e:
-                print(f"Failed to check or publish DOI {doi} for {file_path}: {e}")
+                print(f"Failed to check or publish Canonical DOI {canonical_doi}: {e}")
+
+            # 2. Handle Versioned DOIs
+            publications = properties.get("sci:publications", stac_item.get("sci:publications", []))
+            findable_versions = []
+            
+            for pub in publications:
+                v_doi = pub.get("doi")
+                if not v_doi:
+                    continue
+                if prefix and not v_doi.startswith(prefix):
+                    continue # Skip foreign DOIs
+                
+                try:
+                    v_state = client.get_doi_state(v_doi)
+                    if v_state == "draft":
+                        next_version = get_next_version(stac_id, stac_type)
+                        print(f"Publishing Version DOI {v_doi} (v{next_version}) for {file_path}")
+                        target_url = f"{PORTAL_UI_BASE_URL}/{stac_type}s/{stac_id}{suffix}_v{next_version}"
+                        client.publish_doi(v_doi, target_url)
+                        create_and_push_tag(stac_id, stac_type, next_version, v_doi)
+                        published_count += 1
+                        findable_versions.append(v_doi)
+                    elif v_state in ["findable", "registered"]:
+                        findable_versions.append(v_doi)
+                except Exception as e:
+                    print(f"Failed to check or publish Version DOI {v_doi}: {e}")
+
+            # 3. Update Canonical DOI with HasVersion relationships
+            if findable_versions:
+                print(f"Linking Canonical DOI {canonical_doi} to {len(findable_versions)} versions.")
+                related_identifiers = []
+                for v in findable_versions:
+                    related_identifiers.append({
+                        "relatedIdentifier": v,
+                        "relatedIdentifierType": "DOI",
+                        "relationType": "HasVersion"
+                    })
+                try:
+                    # We only update the relatedIdentifiers attribute
+                    client.update_doi(canonical_doi, {"relatedIdentifiers": related_identifiers})
+                except Exception as e:
+                    print(f"Failed to link versions to Canonical DOI {canonical_doi}: {e}")
 
     print(f"Finished. Published {published_count} DOIs.")
 

@@ -91,6 +91,25 @@ def is_significant_change(current: Dict[str, Any], historical: Dict[str, Any]) -
         
     return False
 
+def check_pr_for_new_version_request() -> bool:
+    """Checks the PR body for the checkbox 'Request new DOI version'."""
+    import re
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    if not event_path or not os.path.exists(event_path):
+        return False
+    
+    try:
+        with open(event_path, 'r') as f:
+            event_data = json.load(f)
+            pr_body = event_data.get("pull_request", {}).get("body", "")
+            if not pr_body:
+                return False
+            # Look for [x] Request new DOI version or [X] Request new DOI version
+            return bool(re.search(r"-\s*\[[xX]\]\s*Request new DOI version", pr_body))
+    except Exception as e:
+        print(f"Warning: Could not check PR body: {e}")
+        return False
+
 def check_doi_need(file_path: str) -> Tuple[bool, Optional[str]]:
     """
     Checks if a file needs a new DOI.
@@ -98,6 +117,10 @@ def check_doi_need(file_path: str) -> Tuple[bool, Optional[str]]:
     """
     if not os.path.exists(file_path):
         return False, None
+
+    # Check for explicit version request first
+    if check_pr_for_new_version_request():
+        return True, "Explicit version request via PR checkbox"
 
     with open(file_path, 'r') as f:
         try:

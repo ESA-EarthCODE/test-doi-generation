@@ -8,12 +8,12 @@ import re
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from datacite import DataCiteClient, map_stac_to_datacite
-from check_changes import check_doi_need
+from check_changes import check_doi_need, check_pr_for_new_version_request
 
 SCIENTIFIC_EXTENSION_URL = "https://stac-extensions.github.io/scientific/v1.0.0/schema.json"
 PORTAL_UI_BASE_URL = os.getenv("PORTAL_UI_BASE_URL", "https://opensciencedata.esa.int")
 
-def surgical_update(file_path: str, doi: str):
+def surgical_update(file_path: str, doi: str, is_publication: bool = False):
     """Updates the STAC collection or OGC Record file using string manipulation to preserve formatting."""
     with open(file_path, 'r', encoding='utf-8') as f:
         content = f.read()
@@ -22,100 +22,123 @@ def surgical_update(file_path: str, doi: str):
     is_record = file_path.endswith("record.json")
     prefix = os.environ.get("DATACITE_PREFIX")
 
-    # 1. Handle Foreign DOI Migration
-    if prefix and '"sci:doi"' in content:
-        doi_match = re.search(r'"sci:doi"\s*:\s*"([^"]+)"', content)
-        if doi_match:
-            existing_val = doi_match.group(1)
-            # If the current DOI is foreign (doesn't match our prefix)
-            if not existing_val.startswith(prefix):
-                print(f"Migrating foreign DOI {existing_val} to sci:publications")
-                
-                # Sanitize the existing value to ensure it's a valid DOI pattern, not a URL
-                sanitized_val = existing_val.replace("https://doi.org/", "").replace("http://doi.org/", "")
-                
-                # Avoid adding it again if it's already there
-                if f'"{sanitized_val}"' not in content or '"sci:publications"' not in content:
-                    if '"sci:publications"' in content:
-                        # Append to existing sci:publications array
-                        pub_match = re.search(r'("sci:publications"\s*:\s*\[[^\]]*)', content, re.DOTALL)
-                        if pub_match:
-                            prefix_content = pub_match.group(1)
-                            # Determine indentation
-                            lines = prefix_content.split('\n')
-                            indent = "    "
-                            for line in reversed(lines):
-                                if line.strip() and not line.strip().endswith('['):
-                                    m = re.match(r'^(\s*)', line)
-                                    if m:
-                                        indent = m.group(1)
-                                        break
-                            
-                            sep = "," if not prefix_content.strip().endswith("[") else ""
-                            new_pub = f'{sep}\n{indent}{{"doi": "{sanitized_val}"}}'
-                            content = content.replace(prefix_content, prefix_content + new_pub)
-                    else:
-                        # Create sci:publications array after the first {
-                        match = re.search(r'^(\s+)"', content, re.MULTILINE)
-                        indent = match.group(1) if match else "  "
-                        pub_entry = f'{indent}"sci:publications": [\n{indent}{indent}{{"doi": "{sanitized_val}"}}\n{indent}],\n'
-                        content = re.sub(r'^(\s*)\{(\r?\n)', r'\g<1>{\g<2>' + pub_entry, content)
+    if is_publication:
+        # Append to sci:publications
+        if '"sci:publications"' in content:
+            # Check if this DOI is already there
+            if f'"{doi}"' in content:
+                print(f"DOI {doi} already exists in sci:publications for {file_path}")
+                return
 
-    # 2. Update/Insert sci:doi
-    if '"sci:doi"' in content:
-        # Update existing DOI value
-        # We use \g<1> and \g<2> to avoid ambiguity if the doi string starts with digits (e.g. \110 -> octal H)
-        content = re.sub(r'("sci:doi"\s*:\s*")[^"]+(")', r'\g<1>' + doi + r'\g<2>', content)
-    else:
-        if is_record and '"properties"' in content:
-            # Insert sci:doi inside properties
-            # Find the properties block and its first key to match indentation
-            match = re.search(r'("properties"\s*:\s*\{(\r?\n))(\s+)"', content)
-            if match:
-                prefix = match.group(1)
-                indent = match.group(3)
-                content = content.replace(prefix, prefix + indent + f'"sci:doi": "{doi}",\n')
+            # Append to existing sci:publications array
+            pub_match = re.search(r'("sci:publications"\s*:\s*\[[^\]]*)', content, re.DOTALL)
+            if pub_match:
+                prefix_content = pub_match.group(1)
+                # Determine indentation
+                lines = prefix_content.split('\n')
+                indent = "    "
+                for line in reversed(lines):
+                    if line.strip() and not line.strip().endswith('['):
+                        m = re.match(r'^(\s*)', line)
+                        if m:
+                            indent = m.group(1)
+                            break
+                
+                sep = "," if not prefix_content.strip().endswith("[") else ""
+                new_pub = f'{sep}\n{indent}{{"doi": "{doi}"}}'
+                content = content.replace(prefix_content, prefix_content + new_pub)
+        else:
+            # Create sci:publications array
+            if is_record and '"properties"' in content:
+                 match = re.search(r'("properties"\s*:\s*\{(\r?\n))(\s+)"', content)
+                 if match:
+                    block_prefix = match.group(1)
+                    indent = match.group(3)
+                    pub_entry = indent + f'"sci:publications": [\n{indent}{indent}{{"doi": "{doi}"}}\n{indent}],\n'
+                    content = content.replace(block_prefix, block_prefix + pub_entry)
+                 else:
+                    match = re.search(r'^(\s+)"', content, re.MULTILINE)
+                    indent = match.group(1) if match else "  "
+                    pub_entry = f'{indent}"sci:publications": [\n{indent}{indent}{{"doi": "{doi}"}}\n{indent}],\n'
+                    content = re.sub(r'^(\s*)\{(\r?\n)', r'\g<1>{\g<2>' + pub_entry, content)
             else:
-                # Fallback: insert after {
+                match = re.search(r'^(\s+)"', content, re.MULTILINE)
+                indent = match.group(1) if match else "  "
+                pub_entry = f'{indent}"sci:publications": [\n{indent}{indent}{{"doi": "{doi}"}}\n{indent}],\n'
+                content = re.sub(r'^(\s*)\{(\r?\n)', r'\g<1>{\g<2>' + pub_entry, content)
+    else:
+        # Update/Insert sci:doi (Canonical)
+        # 1. Handle Foreign DOI Migration (Existing logic)
+        if prefix and '"sci:doi"' in content:
+            doi_match = re.search(r'"sci:doi"\s*:\s*"([^"]+)"', content)
+            if doi_match:
+                existing_val = doi_match.group(1)
+                if not existing_val.startswith(prefix):
+                    print(f"Migrating foreign DOI {existing_val} to sci:publications")
+                    sanitized_val = existing_val.replace("https://doi.org/", "").replace("http://doi.org/", "")
+                    if f'"{sanitized_val}"' not in content or '"sci:publications"' not in content:
+                        if '"sci:publications"' in content:
+                            pub_match = re.search(r'("sci:publications"\s*:\s*\[[^\]]*)', content, re.DOTALL)
+                            if pub_match:
+                                prefix_content = pub_match.group(1)
+                                lines = prefix_content.split('\n')
+                                indent = "    "
+                                for line in reversed(lines):
+                                    if line.strip() and not line.strip().endswith('['):
+                                        m = re.match(r'^(\s*)', line)
+                                        if m:
+                                            indent = m.group(1)
+                                            break
+                                sep = "," if not prefix_content.strip().endswith("[") else ""
+                                new_pub = f'{sep}\n{indent}{{"doi": "{sanitized_val}"}}'
+                                content = content.replace(prefix_content, prefix_content + new_pub)
+                        else:
+                            match = re.search(r'^(\s+)"', content, re.MULTILINE)
+                            indent = match.group(1) if match else "  "
+                            pub_entry = f'{indent}"sci:publications": [\n{indent}{indent}{{"doi": "{sanitized_val}"}}\n{indent}],\n'
+                            content = re.sub(r'^(\s*)\{(\r?\n)', r'\g<1>{\g<2>' + pub_entry, content)
+
+        if '"sci:doi"' in content:
+            content = re.sub(r'("sci:doi"\s*:\s*")[^"]+(")', r'\g<1>' + doi + r'\g<2>', content)
+        else:
+            if is_record and '"properties"' in content:
+                match = re.search(r'("properties"\s*:\s*\{(\r?\n))(\s+)"', content)
+                if match:
+                    prefix_block = match.group(1)
+                    indent = match.group(3)
+                    content = content.replace(prefix_block, prefix_block + indent + f'"sci:doi": "{doi}",\n')
+                else:
+                    match = re.search(r'^(\s+)"', content, re.MULTILINE)
+                    indent = match.group(1) if match else "  "
+                    content = re.sub(r'^(\s*)\{(\r?\n)', r'\g<1>{\g<2>' + indent + f'"sci:doi": "{doi}",\n', content)
+            else:
                 match = re.search(r'^(\s+)"', content, re.MULTILINE)
                 indent = match.group(1) if match else "  "
                 content = re.sub(r'^(\s*)\{(\r?\n)', r'\g<1>{\g<2>' + indent + f'"sci:doi": "{doi}",\n', content)
-        else:
-            # Insert sci:doi after the first { and its following newline
-            match = re.search(r'^(\s+)"', content, re.MULTILINE)
-            indent = match.group(1) if match else "  "
-            content = re.sub(r'^(\s*)\{(\r?\n)', r'\g<1>{\g<2>' + indent + f'"sci:doi": "{doi}",\n', content)
 
-    # 2. Update/Insert Extensions
+    # Update Extensions (Existing logic)
     ext_key = "conformsTo" if is_record else "stac_extensions"
     if scientific_ext not in content:
         if f'"{ext_key}"' in content:
-            # Find the array and append the new extension
             match = re.search(rf'("{ext_key}"\s*:\s*\[[^\]]*)', content, re.DOTALL)
             if match:
-                prefix = match.group(1).rstrip()
-                
-                # Determine indentation for the new item
-                lines = prefix.split('\n')
-                item_indent = "    " # Default fallback
+                prefix_block = match.group(1).rstrip()
+                lines = prefix_block.split('\n')
+                item_indent = "    "
                 for line in reversed(lines):
                     if line.strip() and not line.strip().endswith('['):
                         m = re.match(r'^(\s*)', line)
                         if m:
                             item_indent = m.group(1)
                             break
-                            
-                # Get the trailing whitespace to preserve closing bracket formatting
                 trailing_ws_match = re.search(r'(\s+)$', match.group(1))
                 trailing_ws = trailing_ws_match.group(1) if trailing_ws_match else "\n  "
-
-                if prefix.strip().endswith('['):
+                if prefix_block.strip().endswith('['):
                     new_ext = f'\n{item_indent}"{scientific_ext}"'
                 else:
                     new_ext = f',\n{item_indent}"{scientific_ext}"'
-                content = content.replace(match.group(1), prefix + new_ext + trailing_ws)
+                content = content.replace(match.group(1), prefix_block + new_ext + trailing_ws)
         else:
-            # Insert extension key after the first {
             match = re.search(r'^(\s+)"', content, re.MULTILINE)
             indent = match.group(1) if match else "  "
             ext_entry = f'{indent}"{ext_key}": [\n{indent}{indent}"{scientific_ext}"\n{indent}],\n'
@@ -146,45 +169,81 @@ def main():
                 glob.glob("workflows/**/record.json", recursive=True)
 
     summary = []
-    modified_files = []
+    new_version_requested = check_pr_for_new_version_request()
+    prefix = os.environ.get("DATACITE_PREFIX")
 
     for file_path in files:
-        needs_doi, reason = check_doi_need(file_path)
-        if needs_doi:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                stac_item = json.load(f)
-            
-            # Map metadata
+        with open(file_path, 'r', encoding='utf-8') as f:
+            stac_item = json.load(f)
+        
+        properties = stac_item.get("properties", stac_item)
+        canonical_doi = properties.get("sci:doi") or stac_item.get("sci:doi")
+        
+        # 1. Canonical DOI Logic
+        if not canonical_doi or (prefix and not canonical_doi.startswith(prefix)):
+            print(f"Generating Canonical DOI for {file_path}")
             metadata = map_stac_to_datacite(stac_item, PORTAL_UI_BASE_URL)
-            
-            # Check if we should update or create
-            existing_doi = stac_item.get("properties", stac_item).get("sci:doi")
-            doi_to_use = None
-            action = "created"
+            try:
+                new_canonical = client.create_draft_doi(metadata)
+                surgical_update(file_path, new_canonical, is_publication=False)
+                summary.append(f"- {file_path}: Created Canonical DOI {new_canonical}")
+                canonical_doi = new_canonical
+            except Exception as e:
+                print(f"Failed to create canonical DOI for {file_path}: {e}")
+                summary.append(f"- {file_path}: FAILED to create Canonical DOI ({e})")
+                continue
+        else:
+            # Update existing Canonical DOI metadata
+            print(f"Updating metadata for Canonical DOI {canonical_doi}")
+            metadata = map_stac_to_datacite(stac_item, PORTAL_UI_BASE_URL)
+            try:
+                client.update_doi(canonical_doi, metadata)
+                summary.append(f"- {file_path}: Updated Canonical DOI metadata ({canonical_doi})")
+            except Exception as e:
+                print(f"Failed to update Canonical DOI {canonical_doi}: {e}")
 
-            if existing_doi:
-                state = client.get_doi_state(existing_doi)
-                if state == "draft":
-                    print(f"Updating existing draft DOI {existing_doi} for {file_path}")
-                    client.update_doi(existing_doi, metadata)
-                    doi_to_use = existing_doi
-                    action = "updated"
-                else:
-                    print(f"Existing DOI {existing_doi} is {state}. Creating a new version.")
+        # 2. Versioned DOI Logic
+        if new_version_requested:
+            print(f"New version requested for {file_path}. Generating Draft Version DOI.")
+            # Map metadata for versioned DOI
+            # Relationships will be set during publication to point specifically to the new version number
+            metadata = map_stac_to_datacite(stac_item, PORTAL_UI_BASE_URL)
+            if canonical_doi:
+                metadata["relatedIdentifiers"] = [{
+                    "relatedIdentifier": canonical_doi,
+                    "relatedIdentifierType": "DOI",
+                    "relationType": "IsVersionOf"
+                }]
 
-            if not doi_to_use:
-                print(f"Generating new DOI for {file_path} (Reason: {reason})")
-                try:
-                    doi_to_use = client.create_draft_doi(metadata)
-                    # Surgically update the file to preserve formatting
-                    surgical_update(file_path, doi_to_use)
-                except Exception as e:
-                    print(f"Failed to create DOI for {file_path}: {e}")
-                    summary.append(f"- {file_path}: FAILED ({e})")
-                    continue
-
-            summary.append(f"- {file_path}: {doi_to_use} ({action}, Reason: {reason})")
-            modified_files.append(file_path)
+            try:
+                new_version_doi = client.create_draft_doi(metadata)
+                surgical_update(file_path, new_version_doi, is_publication=True)
+                summary.append(f"- {file_path}: Created Draft Version DOI {new_version_doi}")
+            except Exception as e:
+                print(f"Failed to create version DOI for {file_path}: {e}")
+                summary.append(f"- {file_path}: FAILED to create Version DOI ({e})")
+        else:
+            # Update metadata for the latest existing versioned DOI if it's a draft
+            publications = properties.get("sci:publications", stac_item.get("sci:publications", []))
+            if publications:
+                our_versions = [p.get("doi") for p in publications if p.get("doi") and (not prefix or p.get("doi").startswith(prefix))]
+                if our_versions:
+                    latest_v_doi = our_versions[-1]
+                    try:
+                        state = client.get_doi_state(latest_v_doi)
+                        if state == "draft":
+                            print(f"Updating metadata for Draft Version DOI {latest_v_doi}")
+                            metadata = map_stac_to_datacite(stac_item, PORTAL_UI_BASE_URL)
+                            if canonical_doi:
+                                metadata["relatedIdentifiers"] = [{
+                                    "relatedIdentifier": canonical_doi,
+                                    "relatedIdentifierType": "DOI",
+                                    "relationType": "IsVersionOf"
+                                }]
+                            client.update_doi(latest_v_doi, metadata)
+                            summary.append(f"- {file_path}: Updated Latest Draft Version DOI metadata ({latest_v_doi})")
+                    except Exception as e:
+                        print(f"Failed to update/check Version DOI {latest_v_doi}: {e}")
 
     if summary:
         print("\nDOI Generation Summary:")
@@ -194,7 +253,7 @@ def main():
             f.write("## DOI Generation Summary\n\n")
             f.write("\n".join(summary))
     else:
-        print("No DOIs needed to be generated.")
+        print("No DOI actions performed.")
 
 if __name__ == "__main__":
     main()

@@ -124,9 +124,38 @@ def build_versioned_files(file_path: str, dist_dir: str):
         
         v_filename = f"{base_name}_v{v_num}{ext}"
         
+        # Swap DOIs for versioned files:
+        # Versioned DOI goes to sci:doi, Canonical DOI goes to sci:publications
+        props = data.get("properties", data)
+        canonical_doi = props.get("sci:doi") or data.get("sci:doi")
+        publications = props.get("sci:publications", data.get("sci:publications", []))
+        
+        # Find the DOI corresponding to this version number
+        # We assume the N-th publication in the list corresponds to version vN
+        version_doi = None
+        if publications and len(publications) >= v_num:
+             version_doi = publications[v_num - 1].get("doi")
+        
+        if version_doi and canonical_doi:
+            if "properties" in data:
+                data["properties"]["sci:doi"] = version_doi
+                data["properties"]["sci:publications"] = [{"doi": canonical_doi}]
+            else:
+                data["sci:doi"] = version_doi
+                data["sci:publications"] = [{"doi": canonical_doi}]
+
         # Inject navigation links
         links = data.get("links", [])
         
+        # Canonical link
+        links.append({"rel": "IsVersionOf", "href": f"{base_name}{ext}", "type": "application/json", "title": "Canonical version"})
+
+        # Version history link (DataCite JSON variant for the Canonical DOI)
+        if canonical_doi:
+            api_base = "https://api.test.datacite.org" if "test.datacite" in canonical_doi or os.getenv("DATACITE_API_URL", "").strip().endswith("test.datacite.org") else "https://api.datacite.org"
+            datacite_json_url = f"{api_base}/dois/application/vnd.datacite.datacite+json/{canonical_doi}"
+            links.append({"rel": "version-history", "href": datacite_json_url, "type": "application/vnd.datacite.datacite+json", "title": "Version History (DataCite JSON)"})
+
         # Latest version link should point to the actual latest versioned file
         if v_num < latest_v_num:
             links.append({"rel": "latest-version", "href": f"{base_name}_v{latest_v_num}{ext}", "type": "application/json", "title": "Latest version"})
@@ -206,7 +235,25 @@ def copy_latest(file_path: str, dist_dir: str, data: Dict[str, Any], num_version
                     shutil.copy(item_path, os.path.join(target_subdir, os.path.basename(item_path)))
 
     # Inject navigation links into the latest version
-    # NO latest-version link for the latest version itself
+    # Point to the actual latest versioned file
+    links.append({"rel": "latest-version", "href": f"{base_name}_v{latest_v_num}{ext}", "type": "application/json", "title": "Latest version"})
+
+    # Point to all versions
+    props = data.get("properties", data)
+    stac_id = props.get("id", data.get("id"))
+    raw_type = props.get("osc:type", data.get("osc:type", props.get("type", "product")))
+    stac_type = "workflow" if raw_type == "workflow" else "product"
+
+    tags = get_tags_for_item(stac_id, stac_type)
+    for v_num, _, _ in tags:
+         links.append({"rel": "HasVersion", "href": f"{base_name}_v{v_num}{ext}", "type": "application/json", "title": f"Version {v_num}"})
+
+    # Version history link (DataCite JSON variant for the Canonical DOI)
+    if doi:
+        api_base = "https://api.test.datacite.org" if "test.datacite" in doi or os.getenv("DATACITE_API_URL", "").strip().endswith("test.datacite.org") else "https://api.datacite.org"
+        datacite_json_url = f"{api_base}/dois/application/vnd.datacite.datacite+json/{doi}"
+        links.append({"rel": "version-history", "href": datacite_json_url, "type": "application/vnd.datacite.datacite+json", "title": "Version History (DataCite JSON)"})
+
     if prev_v_num is not None:
          links.append({"rel": "predecessor-version", "href": f"{base_name}_v{prev_v_num}{ext}", "type": "application/json", "title": "Predecessor"})
     
