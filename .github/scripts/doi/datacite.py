@@ -3,7 +3,7 @@ import json
 import urllib.request
 import urllib.error
 import base64
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 DATACITE_API_BASE_URL = os.getenv("DATACITE_API_URL", "https://api.test.datacite.org")
 DATACITE_USER = os.getenv("DATACITE_USER")
