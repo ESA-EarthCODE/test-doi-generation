@@ -172,6 +172,14 @@ def build_versioned_files(file_path: str, dist_dir: str):
         # Set the explicit version property to match the tag number
         data["version"] = str(v_num)
 
+        # Ensure the Version Extension is in stac_extensions
+        version_ext_url = "https://stac-extensions.github.io/version/v1.2.0/schema.json"
+        if "stac_extensions" in data:
+            if version_ext_url not in data["stac_extensions"]:
+                data["stac_extensions"].append(version_ext_url)
+        else:
+            data["stac_extensions"] = [version_ext_url]
+
         with open(os.path.join(target_subdir, f"{base_name}_v{v_num}{ext}"), 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
 
@@ -263,6 +271,14 @@ def copy_latest(file_path: str, dist_dir: str, data: Dict[str, Any], num_version
     # Remove the version property from the canonical file
     if "version" in data:
         del data["version"]
+
+    # Ensure the Version Extension is in stac_extensions
+    version_ext_url = "https://stac-extensions.github.io/version/v1.2.0/schema.json"
+    if "stac_extensions" in data:
+        if version_ext_url not in data["stac_extensions"]:
+            data["stac_extensions"].append(version_ext_url)
+    else:
+        data["stac_extensions"] = [version_ext_url]
     
     with open(os.path.join(target_subdir, filename), 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
