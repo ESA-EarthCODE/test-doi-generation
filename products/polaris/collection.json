@@ -1,4 +1,8 @@
 {
+  "sci:publications": [
+    {"doi": "10.83678/609x-mm53"}
+  ],
+  "sci:doi": "10.83678/ggvj-s122",
   "type": "Collection",
   "id": "polaris",
   "stac_version": "1.0.0",
