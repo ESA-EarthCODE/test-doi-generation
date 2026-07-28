@@ -148,7 +148,7 @@ def build_versioned_files(file_path: str, dist_dir: str):
         links = data.get("links", [])
         
         # Canonical link
-        links.append({"rel": "IsVersionOf", "href": f"{base_name}{ext}", "type": "application/json", "title": "Canonical version"})
+        links.append({"rel": "is-version-of", "href": f"{base_name}{ext}", "type": "application/json", "title": "Canonical version"})
 
         # Version history link (DataCite JSON variant for the Canonical DOI)
         if canonical_doi:
@@ -246,7 +246,7 @@ def copy_latest(file_path: str, dist_dir: str, data: Dict[str, Any], num_version
 
     tags = get_tags_for_item(stac_id, stac_type)
     for v_num, _, _ in tags:
-         links.append({"rel": "HasVersion", "href": f"{base_name}_v{v_num}{ext}", "type": "application/json", "title": f"Version {v_num}"})
+         links.append({"rel": "has-version", "href": f"{base_name}_v{v_num}{ext}", "type": "application/json", "title": f"Version {v_num}"})
 
     # Version history link (DataCite JSON variant for the Canonical DOI)
     canonical_doi = props.get("sci:doi") or data.get("sci:doi")

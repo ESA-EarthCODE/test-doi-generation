@@ -8,7 +8,7 @@ import re
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from datacite import DataCiteClient, map_stac_to_datacite
-from check_changes import check_doi_need, check_pr_for_new_version_request
+from check_changes import check_doi_need, check_pr_for_new_version_requests
 
 SCIENTIFIC_EXTENSION_URL = "https://stac-extensions.github.io/scientific/v1.0.0/schema.json"
 PORTAL_UI_BASE_URL = os.getenv("PORTAL_UI_BASE_URL", "https://opensciencedata.esa.int")
@@ -169,7 +169,7 @@ def main():
                 glob.glob("workflows/**/record.json", recursive=True)
 
     summary = []
-    new_version_requested = check_pr_for_new_version_request()
+    requested_versions = check_pr_for_new_version_requests()
     prefix = os.environ.get("DATACITE_PREFIX")
 
     for file_path in files:
@@ -205,8 +205,9 @@ def main():
                 print(f"Failed to update Canonical DOI {canonical_doi}: {e}")
 
         # 2. Versioned DOI Logic
-        if new_version_requested or is_new_canonical:
-            reason = "New version requested" if new_version_requested else "Initial version for new Canonical DOI"
+        is_version_requested = file_path in requested_versions
+        if is_version_requested or is_new_canonical:
+            reason = "New version requested" if is_version_requested else "Initial version for new Canonical DOI"
             print(f"{reason} for {file_path}. Generating Draft Version DOI.")
             # Map metadata for versioned DOI
             # Relationships will be set during publication to point specifically to the new version number
