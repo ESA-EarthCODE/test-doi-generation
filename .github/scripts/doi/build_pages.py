@@ -152,7 +152,7 @@ def build_versioned_files(file_path: str, dist_dir: str):
 
         # Version history link (DataCite JSON variant for the Canonical DOI)
         if canonical_doi:
-            api_base = "https://api.test.datacite.org" if "test.datacite" in canonical_doi or os.getenv("DATACITE_API_URL", "").strip().endswith("test.datacite.org") else "https://api.datacite.org"
+            api_base = os.getenv("DATACITE_API_URL", "https://api.test.datacite.org")
             datacite_json_url = f"{api_base}/dois/application/vnd.datacite.datacite+json/{canonical_doi}"
             links.append({"rel": "version-history", "href": datacite_json_url, "type": "application/vnd.datacite.datacite+json", "title": "Version History (DataCite JSON)"})
 
@@ -251,7 +251,7 @@ def copy_latest(file_path: str, dist_dir: str, data: Dict[str, Any], num_version
     # Version history link (DataCite JSON variant for the Canonical DOI)
     canonical_doi = props.get("sci:doi") or data.get("sci:doi")
     if canonical_doi:
-        api_base = "https://api.test.datacite.org" if "test.datacite" in canonical_doi or os.getenv("DATACITE_API_URL", "").strip().endswith("test.datacite.org") else "https://api.datacite.org"
+        api_base = os.getenv("DATACITE_API_URL", "https://api.test.datacite.org")
         datacite_json_url = f"{api_base}/dois/application/vnd.datacite.datacite+json/{canonical_doi}"
         links.append({"rel": "version-history", "href": datacite_json_url, "type": "application/vnd.datacite.datacite+json", "title": "Version History (DataCite JSON)"})
 
