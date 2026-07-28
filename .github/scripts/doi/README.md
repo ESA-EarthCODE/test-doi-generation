@@ -9,9 +9,9 @@ The system supports a **Canonical DOI** for the root endpoint and **Versioned DO
 ### 1. Detection & Automation Phase
 The system identifies the need for a new Canonical DOI or a metadata update.
 
-- **Canonical DOI:** A STAC Collection (`products/**/collection.json`) or OGC Record (`workflows/**/record.json`) lacks the `sci:doi` property. This DOI points to the root endpoint (e.g., `/products/4dmed-2d-alt/collection`).
-- **Versioned DOI:** A new DOI version is only created if explicitly requested by a Data Steward.
-- **Requesting a New Version:** To generate a new DOI version, the Data Steward must check the following box in the Pull Request body:
+- **Canonical DOI:** A STAC Collection (`products/**/collection.json`) or OGC Record (`workflows/**/record.json`) lacks the `sci:doi` property. This DOI points to the root endpoint (e.g., `/products/4dmed-2d-alt/collection`). When a new Canonical DOI is generated, an initial Versioned DOI (v1) is also automatically generated to ensure a stable snapshot exists from day one.
+- **Versioned DOI:** A new DOI version is only created if explicitly requested by a Data Steward, or automatically when a new Canonical DOI is created for the first time.
+- **Requesting a New Version:** To generate a new DOI version for an existing product, the Data Steward must check the following box in the Pull Request body:
     - `[x] Request new DOI version`
 - **Significant Change & Metadata Updates:**
     - If changes are detected in fields like `title`, `description`, `keywords`, `providers`, `extent`, or `links`, but **no new version is requested**, the system will **update the metadata** of the existing Canonical DOI and the latest versioned DOI on DataCite.

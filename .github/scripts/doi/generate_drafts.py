@@ -180,6 +180,7 @@ def main():
         canonical_doi = properties.get("sci:doi") or stac_item.get("sci:doi")
         
         # 1. Canonical DOI Logic
+        is_new_canonical = False
         if not canonical_doi or (prefix and not canonical_doi.startswith(prefix)):
             print(f"Generating Canonical DOI for {file_path}")
             metadata = map_stac_to_datacite(stac_item, PORTAL_UI_BASE_URL)
@@ -188,6 +189,7 @@ def main():
                 surgical_update(file_path, new_canonical, is_publication=False)
                 summary.append(f"- {file_path}: Created Canonical DOI {new_canonical}")
                 canonical_doi = new_canonical
+                is_new_canonical = True
             except Exception as e:
                 print(f"Failed to create canonical DOI for {file_path}: {e}")
                 summary.append(f"- {file_path}: FAILED to create Canonical DOI ({e})")
@@ -203,8 +205,9 @@ def main():
                 print(f"Failed to update Canonical DOI {canonical_doi}: {e}")
 
         # 2. Versioned DOI Logic
-        if new_version_requested:
-            print(f"New version requested for {file_path}. Generating Draft Version DOI.")
+        if new_version_requested or is_new_canonical:
+            reason = "New version requested" if new_version_requested else "Initial version for new Canonical DOI"
+            print(f"{reason} for {file_path}. Generating Draft Version DOI.")
             # Map metadata for versioned DOI
             # Relationships will be set during publication to point specifically to the new version number
             metadata = map_stac_to_datacite(stac_item, PORTAL_UI_BASE_URL)
