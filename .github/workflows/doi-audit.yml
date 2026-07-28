@@ -59,6 +59,13 @@ jobs:
           FILES_FLAT=$(echo $FILES | tr '\n' ' ')
           echo "CHANGED_FILES=$FILES_FLAT" >> $GITHUB_ENV
 
+      - name: Update PR Body Checklist
+        if: github.event_name == 'pull_request_target'
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_PAT || secrets.GITHUB_TOKEN }}
+          CHANGED_FILES: ${{ env.CHANGED_FILES }}
+        run: python .github/scripts/doi/update_pr_body.py
+
       - name: Run DOI Draft Generation
         env:
           DATACITE_API_URL: ${{ secrets.DATACITE_API_URL || 'https://api.test.datacite.org' }}
