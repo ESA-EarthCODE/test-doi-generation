@@ -37,8 +37,8 @@ When a PR is merged into `main`:
 
 ### 4. Versioned GitHub Pages Deployment
 On every push to `main`, the system builds a versioned static site in the `dist/` directory:
-- **Canonical File (`collection.json`)**: Contains links to all versions (`HasVersion`), the latest versioned snapshot (`latest-version`), and the DataCite history (`version-history`).
-- **Versioned Files (`collection_vN.json`)**: Contain links to the canonical root (`IsVersionOf`), predecessor/successor versions, and DataCite metadata.
+- **Canonical File (`collection.json`)**: Contains links to all versions (`has-version`), the latest versioned snapshot (`latest-version`), and the DataCite history (`version-history`).
+- **Versioned Files (`collection_vN.json`)**: Contain links to the canonical root (`is-version-of`), predecessor/successor versions, and DataCite metadata.
 - **Recursive Item Versioning:** Associated local STAC Items are snapshotted at the corresponding tag and linked from the versioned collection.
 
 ## DataCite Metadata Mapping
