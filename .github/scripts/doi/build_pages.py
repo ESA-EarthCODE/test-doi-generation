@@ -166,10 +166,13 @@ def build_versioned_files(file_path: str, dist_dir: str):
         if i < num_versions - 1:
             next_v_num = tags[i+1][0]
             links.append({"rel": "successor-version", "href": f"{base_name}_v{next_v_num}{ext}", "type": "application/json", "title": "Successor"})
-        
+
         data["links"] = links
-        
-        with open(os.path.join(target_subdir, v_filename), 'w', encoding='utf-8') as f:
+
+        # Set the explicit version property to match the tag number
+        data["version"] = str(v_num)
+
+        with open(os.path.join(target_subdir, f"{base_name}_v{v_num}{ext}"), 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
 
     # Copy latest
@@ -254,11 +257,12 @@ def copy_latest(file_path: str, dist_dir: str, data: Dict[str, Any], num_version
         api_base = os.getenv("DATACITE_API_URL", "https://api.test.datacite.org")
         datacite_json_url = f"{api_base}/dois/application/vnd.datacite.datacite+json/{canonical_doi}"
         links.append({"rel": "version-history", "href": datacite_json_url, "type": "application/vnd.datacite.datacite+json", "title": "Version History (DataCite JSON)"})
-
-    if prev_v_num is not None:
-         links.append({"rel": "predecessor-version", "href": f"{base_name}_v{prev_v_num}{ext}", "type": "application/json", "title": "Predecessor"})
     
     data["links"] = links
+    
+    # Remove the version property from the canonical file
+    if "version" in data:
+        del data["version"]
     
     with open(os.path.join(target_subdir, filename), 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2)
