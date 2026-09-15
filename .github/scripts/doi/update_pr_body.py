@@ -42,6 +42,34 @@ def main():
         filepath = match.group(2)
         existing_states[filepath] = state
     
+    import subprocess
+    base_ref = os.environ.get("BASE_REF")
+    prefix = os.environ.get("DATACITE_PREFIX")
+
+    version_files = []
+    auto_v1_files = []
+
+    for f in changed_files:
+        has_base_doi = False
+        if base_ref:
+            try:
+                content_base = subprocess.check_output(
+                    ["git", "show", f"{base_ref}:{f}"],
+                    stderr=subprocess.DEVNULL
+                ).decode("utf-8")
+                data_base = json.loads(content_base)
+                props_base = data_base.get("properties", data_base)
+                base_doi = props_base.get("sci:doi") or data_base.get("sci:doi")
+                if base_doi and (not prefix or base_doi.startswith(prefix)):
+                    has_base_doi = True
+            except Exception:
+                pass
+
+        if has_base_doi:
+            version_files.append(f)
+        else:
+            auto_v1_files.append(f)
+
     # Generate new checklist
     checklist_lines = [
         "<!-- DOI_CHECKLIST_START -->",
@@ -49,9 +77,19 @@ def main():
         "Select the files you want to generate a new DOI version for. (Otherwise, only the metadata of the Canonical DOI will be updated).",
         ""
     ]
-    for f in changed_files:
-        mark = "x" if existing_states.get(f) else " "
-        checklist_lines.append(f"- [{mark}] Request new DOI version for `{f}`")
+    if version_files:
+        for f in version_files:
+            mark = "x" if existing_states.get(f) else " "
+            checklist_lines.append(f"- [{mark}] Request new DOI version for `{f}`")
+    else:
+        checklist_lines.append("_No existing datasets modified that require manual versioning._")
+
+    if auto_v1_files:
+        checklist_lines.append("")
+        checklist_lines.append("ℹ️ **New Datasets/Workflows (Initial v1 DOI automatically assigned):**")
+        for f in auto_v1_files:
+            checklist_lines.append(f"- `{f}`")
+
     checklist_lines.append("<!-- DOI_CHECKLIST_END -->")
     new_checklist_str = "\n".join(checklist_lines)
 

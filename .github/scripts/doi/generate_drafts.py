@@ -233,6 +233,24 @@ def main():
             except Exception as e:
                 print(f"Failed to update Canonical DOI {canonical_doi}: {e}")
 
+        # Determine if the canonical DOI is brand new in this PR
+        base_doi = None
+        base_ref = os.environ.get("BASE_REF")
+        if base_ref and event_name == "pull_request_target":
+            try:
+                import subprocess
+                content_base = subprocess.check_output(
+                    ["git", "show", f"{base_ref}:{file_path}"],
+                    stderr=subprocess.DEVNULL
+                ).decode("utf-8")
+                data_base = json.loads(content_base)
+                props_base = data_base.get("properties", data_base)
+                base_doi = props_base.get("sci:doi") or data_base.get("sci:doi")
+            except Exception:
+                pass
+
+        is_new_canonical_in_pr = not base_doi or (prefix and not base_doi.startswith(prefix))
+
         # 2. Versioned DOI Logic
         is_version_requested = file_path in requested_versions
         publications = properties.get("sci:publications", stac_item.get("sci:publications", []))
@@ -246,8 +264,13 @@ def main():
             except Exception as e:
                 print(f"Failed to check state for Version DOI {latest_v_doi}: {e}")
 
-        if is_version_requested or is_new_canonical:
-            reason = "New version requested" if is_version_requested else "Initial version for new Canonical DOI"
+        if is_version_requested or is_new_canonical or is_new_canonical_in_pr:
+            if is_new_canonical_in_pr:
+                reason = "Initial version for new Canonical DOI in this PR"
+            elif is_new_canonical:
+                reason = "Initial version for new Canonical DOI"
+            else:
+                reason = "New version requested"
             
             # If the latest version DOI is already a draft, reuse it and update its metadata
             if latest_v_doi and latest_v_state == "draft":

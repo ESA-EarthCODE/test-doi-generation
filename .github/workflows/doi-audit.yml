@@ -66,6 +66,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.BOT_PAT || secrets.GITHUB_TOKEN }}
           CHANGED_FILES: ${{ env.CHANGED_FILES }}
+          BASE_REF: upstream/${{ github.event.pull_request.base.ref }}
+          DATACITE_PREFIX: ${{ secrets.DATACITE_PREFIX }}
         run: python .github/scripts/doi/update_pr_body.py
 
       - name: Run DOI Draft Generation
@@ -76,6 +78,7 @@ jobs:
           DATACITE_PREFIX: ${{ secrets.DATACITE_PREFIX }}
           PORTAL_UI_BASE_URL: ${{ vars.PORTAL_UI_BASE_URL || 'https://opensciencedata.esa.int' }}
           CHANGED_FILES: ${{ env.CHANGED_FILES }}
+          BASE_REF: upstream/${{ github.event.pull_request.base.ref }}
         run: python .github/scripts/doi/generate_drafts.py
 
       - name: Commit changes to PR
