@@ -112,7 +112,11 @@ jobs:
             if [ -f doi_summary.md ]; then
               EOF=$(dd if=/dev/urandom bs=15 count=1 2>/dev/null | base64)
               echo "PR_BODY<<$EOF" >> $GITHUB_ENV
-              cat doi_summary.md >> $GITHUB_ENV
+              head -n 200 doi_summary.md >> $GITHUB_ENV
+              if [ $(wc -l < doi_summary.md) -gt 200 ]; then
+                echo "" >> $GITHUB_ENV
+                echo "... and more files. See GitHub Actions log for the full audit list." >> $GITHUB_ENV
+              fi
               echo "" >> $GITHUB_ENV
               echo "$EOF" >> $GITHUB_ENV
             fi
