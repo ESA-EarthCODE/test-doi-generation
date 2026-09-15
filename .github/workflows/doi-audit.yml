@@ -10,7 +10,7 @@ on:
   #   - cron: '0 0 * * *' # Daily at midnight
 
 concurrency:
-  group: doi-audit-${{ github.event.pull_request.number || github.run_id }}
+  group: doi-audit-${{ github.event.pull_request && github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -27,8 +27,8 @@ jobs:
         uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0 # v6.0.3
         with:
           token: ${{ secrets.BOT_PAT || secrets.GITHUB_TOKEN }}
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request && github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request && github.event.pull_request.head.ref || 'main' }}
           fetch-depth: 0
 
       - name: Checkout (Scheduled/Manual)
