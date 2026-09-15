@@ -9,7 +9,8 @@
   "properties": {
     "sci:publications": [
         {"doi": "10.83678/spmj-ya53"}
-    ],
+    ,
+        {"doi": "10.83678/6bvz-e072"}],
     "sci:doi": "10.83678/yp61-1627",
     "title": "ARCEME Data Cube Pipeline",
     "description": "The pipeline orchestrator creates multi-source satellite datacubes for ARCEME project locations. It processes following datasets: Sentinel-2 L2A (CDSE or Planetary Computer),Sentinel-1 RTC (Planetary Computer),Copernicus DEM (CDSE), ESA WorldCover (Planetary Computer)",
