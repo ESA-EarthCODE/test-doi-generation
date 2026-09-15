@@ -7,7 +7,7 @@
     "type": "Collection",
     "id": "4dmed-2d-alt",
     "stac_version": "1.0.0",
-    "description": "Newer! The gridded Sea Level Anomalies (SLA) presented here result from the application of the Multiscale Inversion of Ocean Surface Topography (MIOST) algorithm, as described by Ubelmann et al., 2019.  The algorithm takes as input Level-3 altimeter data distributed by the Copernicus Marine Service (https://doi.org/10.48670/moi-00139). This product provides additional variables such as Absolute Dynamic Topography and geostrophic currents (both absolute values and anomalies) at a resolution of 1/24° over the Mediterranean Sea and for the period from 2016 to 2022. It is intended for delayed-time applications.",
+    "description": "Newer! Newer! The gridded Sea Level Anomalies (SLA) presented here result from the application of the Multiscale Inversion of Ocean Surface Topography (MIOST) algorithm, as described by Ubelmann et al., 2019.  The algorithm takes as input Level-3 altimeter data distributed by the Copernicus Marine Service (https://doi.org/10.48670/moi-00139). This product provides additional variables such as Absolute Dynamic Topography and geostrophic currents (both absolute values and anomalies) at a resolution of 1/24° over the Mediterranean Sea and for the period from 2016 to 2022. It is intended for delayed-time applications.",
     "links": [
       {
         "rel": "root",
