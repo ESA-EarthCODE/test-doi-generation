@@ -234,7 +234,7 @@ def main():
                 print(f"Failed to update Canonical DOI {canonical_doi}: {e}")
 
         # Determine if the canonical DOI is brand new in this PR
-        base_doi = None
+        is_new_canonical_in_pr = False
         base_ref = os.environ.get("BASE_REF")
         if base_ref and event_name == "pull_request_target":
             try:
@@ -246,10 +246,9 @@ def main():
                 data_base = json.loads(content_base)
                 props_base = data_base.get("properties", data_base)
                 base_doi = props_base.get("sci:doi") or data_base.get("sci:doi")
+                is_new_canonical_in_pr = not base_doi or (prefix and not base_doi.startswith(prefix))
             except Exception:
-                pass
-
-        is_new_canonical_in_pr = not base_doi or (prefix and not base_doi.startswith(prefix))
+                is_new_canonical_in_pr = True
 
         # 2. Versioned DOI Logic
         is_version_requested = file_path in requested_versions
