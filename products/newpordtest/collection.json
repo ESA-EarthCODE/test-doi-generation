@@ -1,4 +1,8 @@
 {
+    "sci:publications": [
+        {"doi": "10.83678/zb0h-4w65"}
+    ],
+    "sci:doi": "10.83678/h2jc-7k15",
     "type": "Collection",
     "id": "newprodtest",
     "stac_version": "1.0.0",
