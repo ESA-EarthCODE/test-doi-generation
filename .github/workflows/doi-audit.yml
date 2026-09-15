@@ -12,6 +12,10 @@ on:
   # schedule:
   #   - cron: '0 0 * * *' # Daily at midnight
 
+concurrency:
+  group: doi-audit-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   audit:
     runs-on: ubuntu-latest

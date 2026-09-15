@@ -8,8 +8,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from datacite import DataCiteClient
 
-def get_doi_from_file_at_commit(file_path: str, commit: str) -> str | None:
-    """Extracts sci:doi from a file at a specific commit."""
+def get_dois_from_file_at_commit(file_path: str, commit: str) -> set:
+    """Extracts all DOIs (canonical and publications) from a file at a specific commit."""
     try:
         content = subprocess.check_output(
             ["git", "show", f"{commit}:{file_path}"],
@@ -17,9 +17,24 @@ def get_doi_from_file_at_commit(file_path: str, commit: str) -> str | None:
         ).decode("utf-8")
         data = json.loads(content)
         properties = data.get("properties", data)
-        return properties.get("sci:doi") or data.get("sci:doi")
+        
+        dois = set()
+        
+        # 1. Canonical DOI
+        canonical = properties.get("sci:doi") or data.get("sci:doi")
+        if canonical:
+            dois.add(canonical)
+            
+        # 2. Versioned DOIs
+        publications = properties.get("sci:publications", data.get("sci:publications", []))
+        for p in publications:
+            v_doi = p.get("doi")
+            if v_doi:
+                dois.add(v_doi)
+                
+        return dois
     except Exception:
-        return None
+        return set()
 
 def main():
     try:
@@ -53,26 +68,36 @@ def main():
         return
 
     deleted_count = 0
-    for file_path in changed_files:
-        head_doi = get_doi_from_file_at_commit(file_path, head_ref)
-        base_doi = get_doi_from_file_at_commit(file_path, base_ref)
+    prefix = os.environ.get("DATACITE_PREFIX")
 
-        # Only consider deleting if the PR has a DOI, and it's different from the base branch's DOI
-        if head_doi and head_doi != base_doi:
-            state = client.get_doi_state(head_doi)
-            
-            # We ONLY delete if it's a draft. (DataCite API also strictly enforces this)
-            if state == "draft":
-                print(f"Deleting dangling draft DOI {head_doi} for {file_path}")
+    for file_path in changed_files:
+        head_dois = get_dois_from_file_at_commit(file_path, head_ref)
+        base_dois = get_dois_from_file_at_commit(file_path, base_ref)
+
+        # Find new DOIs introduced in the PR branch
+        new_dois = head_dois - base_dois
+
+        if new_dois:
+            for doi in new_dois:
+                if prefix and not doi.startswith(prefix):
+                    continue  # Skip foreign/external DOIs
+                
                 try:
-                    client.delete_doi(head_doi)
-                    deleted_count += 1
+                    state = client.get_doi_state(doi)
+                    # We ONLY delete if it's a draft. (DataCite API also strictly enforces this)
+                    if state == "draft":
+                        print(f"Deleting dangling draft DOI {doi} for {file_path}")
+                        try:
+                            client.delete_doi(doi)
+                            deleted_count += 1
+                        except Exception as e:
+                            print(f"Failed to delete DOI {doi}: {e}")
+                    else:
+                        print(f"DOI {doi} is in state '{state}', skipping deletion.")
                 except Exception as e:
-                    print(f"Failed to delete DOI {head_doi}: {e}")
-            else:
-                print(f"DOI {head_doi} is in state '{state}', skipping deletion.")
+                    print(f"Failed to check state for DOI {doi}: {e}")
         else:
-            print(f"No new DOI detected for {file_path} in this PR.")
+            print(f"No new DOIs detected for {file_path} in this PR.")
 
     print(f"Cleanup complete. Deleted {deleted_count} draft DOIs.")
 

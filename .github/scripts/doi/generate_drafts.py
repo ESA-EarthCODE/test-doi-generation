@@ -147,6 +147,35 @@ def surgical_update(file_path: str, doi: str, is_publication: bool = False):
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(content)
 
+def surgical_remove_publication(file_path: str, doi: str):
+    """Surgically removes a DOI entry from sci:publications while preserving layout/formatting."""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Escape the DOI for regex
+    escaped_doi = re.escape(doi)
+
+    # Pattern 1: match entry with a trailing comma
+    pattern_trailing = rf'{{\s*"doi"\s*:\s*"{escaped_doi}"\s*}},\s*'
+    content_new = re.sub(pattern_trailing, "", content)
+
+    if content_new == content:
+        # Pattern 2: match entry with a leading comma
+        pattern_leading = rf',\s*{{\s*"doi"\s*:\s*"{escaped_doi}"\s*}}'
+        content_new = re.sub(pattern_leading, "", content)
+
+    if content_new == content:
+        # Pattern 3: match entry with no commas (only item)
+        pattern_only = rf'{{\s*"doi"\s*:\s*"{escaped_doi}"\s*}}'
+        content_new = re.sub(pattern_only, "", content)
+
+    if content_new != content:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content_new)
+        print(f"Surgically removed DOI {doi} from sci:publications in {file_path}")
+    else:
+        print(f"Warning: Could not find DOI {doi} in sci:publications in {file_path}")
+
 def main():
     try:
         client = DataCiteClient()
@@ -206,48 +235,70 @@ def main():
 
         # 2. Versioned DOI Logic
         is_version_requested = file_path in requested_versions
+        publications = properties.get("sci:publications", stac_item.get("sci:publications", []))
+        our_versions = [p.get("doi") for p in publications if p.get("doi") and (not prefix or p.get("doi").startswith(prefix))]
+        
+        latest_v_doi = our_versions[-1] if our_versions else None
+        latest_v_state = None
+        if latest_v_doi:
+            try:
+                latest_v_state = client.get_doi_state(latest_v_doi)
+            except Exception as e:
+                print(f"Failed to check state for Version DOI {latest_v_doi}: {e}")
+
         if is_version_requested or is_new_canonical:
             reason = "New version requested" if is_version_requested else "Initial version for new Canonical DOI"
-            print(f"{reason} for {file_path}. Generating Draft Version DOI.")
-            # Map metadata for versioned DOI
-            # Relationships will be set during publication to point specifically to the new version number
-            metadata = map_stac_to_datacite(stac_item, PORTAL_UI_BASE_URL)
-            if canonical_doi:
-                metadata["relatedIdentifiers"] = [{
-                    "relatedIdentifier": canonical_doi,
-                    "relatedIdentifierType": "DOI",
-                    "relationType": "IsVersionOf"
-                }]
+            
+            # If the latest version DOI is already a draft, reuse it and update its metadata
+            if latest_v_doi and latest_v_state == "draft":
+                print(f"{reason} for {file_path}, but a Draft Version DOI ({latest_v_doi}) already exists. Reusing it.")
+                metadata = map_stac_to_datacite(stac_item, PORTAL_UI_BASE_URL)
+                if canonical_doi:
+                    metadata["relatedIdentifiers"] = [{
+                        "relatedIdentifier": canonical_doi,
+                        "relatedIdentifierType": "DOI",
+                        "relationType": "IsVersionOf"
+                    }]
+                try:
+                    client.update_doi(latest_v_doi, metadata)
+                    summary.append(f"- {file_path}: Reused and updated Draft Version DOI metadata ({latest_v_doi})")
+                except Exception as e:
+                    print(f"Failed to update existing Draft Version DOI {latest_v_doi}: {e}")
+                    summary.append(f"- {file_path}: FAILED to update Draft Version DOI ({e})")
+            else:
+                # Generate a brand new Draft Version DOI
+                print(f"{reason} for {file_path}. Generating Draft Version DOI.")
+                metadata = map_stac_to_datacite(stac_item, PORTAL_UI_BASE_URL)
+                if canonical_doi:
+                    metadata["relatedIdentifiers"] = [{
+                        "relatedIdentifier": canonical_doi,
+                        "relatedIdentifierType": "DOI",
+                        "relationType": "IsVersionOf"
+                    }]
 
-            try:
-                new_version_doi = client.create_draft_doi(metadata)
-                surgical_update(file_path, new_version_doi, is_publication=True)
-                summary.append(f"- {file_path}: Created Draft Version DOI {new_version_doi}")
-            except Exception as e:
-                print(f"Failed to create version DOI for {file_path}: {e}")
-                summary.append(f"- {file_path}: FAILED to create Version DOI ({e})")
+                try:
+                    new_version_doi = client.create_draft_doi(metadata)
+                    surgical_update(file_path, new_version_doi, is_publication=True)
+                    summary.append(f"- {file_path}: Created Draft Version DOI {new_version_doi}")
+                except Exception as e:
+                    print(f"Failed to create version DOI for {file_path}: {e}")
+                    summary.append(f"- {file_path}: FAILED to create Version DOI ({e})")
         else:
-            # Update metadata for the latest existing versioned DOI if it's a draft
-            publications = properties.get("sci:publications", stac_item.get("sci:publications", []))
-            if publications:
-                our_versions = [p.get("doi") for p in publications if p.get("doi") and (not prefix or p.get("doi").startswith(prefix))]
-                if our_versions:
-                    latest_v_doi = our_versions[-1]
-                    try:
-                        state = client.get_doi_state(latest_v_doi)
-                        if state == "draft":
-                            print(f"Updating metadata for Draft Version DOI {latest_v_doi}")
-                            metadata = map_stac_to_datacite(stac_item, PORTAL_UI_BASE_URL)
-                            if canonical_doi:
-                                metadata["relatedIdentifiers"] = [{
-                                    "relatedIdentifier": canonical_doi,
-                                    "relatedIdentifierType": "DOI",
-                                    "relationType": "IsVersionOf"
-                                }]
-                            client.update_doi(latest_v_doi, metadata)
-                            summary.append(f"- {file_path}: Updated Latest Draft Version DOI metadata ({latest_v_doi})")
-                    except Exception as e:
-                        print(f"Failed to update/check Version DOI {latest_v_doi}: {e}")
+            # No version requested and it is not a new canonical.
+            # If there is a draft version DOI in our publications, we must remove it (Unticked state)
+            if latest_v_doi and latest_v_state == "draft":
+                print(f"No version requested for {file_path}, but a Draft Version DOI ({latest_v_doi}) exists. Deleting draft and removing from publications.")
+                try:
+                    client.delete_doi(latest_v_doi)
+                    surgical_remove_publication(file_path, latest_v_doi)
+                    summary.append(f"- {file_path}: Deleted unticked Draft Version DOI ({latest_v_doi})")
+                except Exception as e:
+                    print(f"Failed to delete/remove unticked Draft Version DOI {latest_v_doi}: {e}")
+                    summary.append(f"- {file_path}: FAILED to delete/remove unticked Draft Version DOI ({e})")
+            else:
+                # No draft exists, or latest version is already published.
+                if latest_v_doi:
+                    print(f"No version requested for {file_path}, and latest version ({latest_v_doi}) is already {latest_v_state or 'published'}. Skipping.")
 
     if summary:
         print("\nDOI Generation Summary:")

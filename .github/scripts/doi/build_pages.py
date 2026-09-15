@@ -131,10 +131,17 @@ def build_versioned_files(file_path: str, dist_dir: str):
         publications = props.get("sci:publications", data.get("sci:publications", []))
         
         # Find the DOI corresponding to this version number
-        # We assume the N-th publication in the list corresponds to version vN
+        # We assume the N-th publication matching our prefix corresponds to version vN.
+        # We can extract the prefix dynamically from the canonical_doi itself.
+        prefix = None
+        if canonical_doi and "/" in canonical_doi:
+            prefix = canonical_doi.split("/")[0]
+
+        our_versions = [p.get("doi") for p in publications if p.get("doi") and (not prefix or p.get("doi").startswith(prefix))]
+
         version_doi = None
-        if publications and len(publications) >= v_num:
-             version_doi = publications[v_num - 1].get("doi")
+        if our_versions and len(our_versions) >= v_num:
+             version_doi = our_versions[v_num - 1]
         
         if version_doi and canonical_doi:
             if "properties" in data:
