@@ -96,11 +96,12 @@ jobs:
         if: github.event_name == 'pull_request_target' && steps.auto_commit.outputs.changes_detected == 'true'
         run: |
           NEW_SHA=$(git rev-parse HEAD)
-          echo "Reporting success status for audit on commit $NEW_SHA"
+          TARGET_REPO="${{ github.event.pull_request && github.event.pull_request.head.repo.full_name || github.repository }}"
+          echo "Reporting success status for audit on commit $NEW_SHA in repository $TARGET_REPO"
           curl -s -X POST \
             -H "Authorization: Bearer ${{ secrets.BOT_PAT || secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
-            https://api.github.com/repos/${{ github.repository }}/statuses/${NEW_SHA} \
+            https://api.github.com/repos/${TARGET_REPO}/statuses/${NEW_SHA} \
             -d '{"state":"success","context":"audit","description":"DOI audit passed (auto-reported)"}'
 
       - name: Check for changes (Scheduled/Manual)
