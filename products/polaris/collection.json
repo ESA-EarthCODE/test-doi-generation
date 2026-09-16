@@ -8,7 +8,7 @@
   "type": "Collection",
   "id": "polaris",
   "stac_version": "1.0.0",
-  "description": "Newer! Polar Operational Limit Assessment Risk Index System (POLARIS)",
+  "description": "External! Newer! Polar Operational Limit Assessment Risk Index System (POLARIS)",
   "links": [
     {
       "rel": "root",
