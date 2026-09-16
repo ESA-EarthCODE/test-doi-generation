@@ -1,24 +1,18 @@
 {
     "sci:publications": [
-        {"doi": "10.83678/kx5y-2a19"}
-    ,
-        {"doi": "10.83678/yyv7-mm22"}],
-    "sci:doi": "10.83678/94f9-0693",
+        {"doi": "10.83678/zb0h-4w65"}
+    ],
+    "sci:doi": "10.83678/h2jc-7k15",
     "type": "Collection",
-    "id": "4dmed-2d-alt",
+    "id": "newprodtest",
     "stac_version": "1.0.0",
-    "description": "Newer! Newer! The gridded Sea Level Anomalies (SLA) presented here result from the application of the Multiscale Inversion of Ocean Surface Topography (MIOST) algorithm, as described by Ubelmann et al., 2019.  The algorithm takes as input Level-3 altimeter data distributed by the Copernicus Marine Service (https://doi.org/10.48670/moi-00139). This product provides additional variables such as Absolute Dynamic Topography and geostrophic currents (both absolute values and anomalies) at a resolution of 1/24° over the Mediterranean Sea and for the period from 2016 to 2022. It is intended for delayed-time applications.",
+    "description": "newprod test description",
     "links": [
       {
         "rel": "root",
         "href": "../../catalog.json",
         "type": "application/json",
         "title": "Open Science Catalog"
-      },
-      {
-        "rel": "via",
-        "href": "https://zenodo.org/records/10648981",
-        "title": "Access"
       },
       {
         "rel": "parent",
@@ -88,7 +82,7 @@
       },
       {
         "rel": "self",
-        "href": "https://esa-earthcode.github.io/open-science-catalog-metadata/products/4dmed-2d-alt/collection.json",
+        "href": "https://esa-earthcode.github.io/open-science-catalog-metadata/products/newprodtest/collection.json",
         "type": "application/json"
       }
     ],
@@ -105,7 +99,7 @@
     "created": "2024-11-26T00:00:00Z",
     "cf:parameter": [
       {
-        "name": "4dmed-2d-alt"
+        "name": "newprodtest"
       }
     ],
     "themes": [
@@ -131,7 +125,7 @@
       "cryosat-2"
     ],
     "updated": "2025-05-28T11:32:06.209108Z",
-    "title": "ESA 4DMED-SEA - Mediterranean Sea Gridded MIOST L4 Sea Surface Heights And Derived Variables",
+    "title": "no doi test title",
     "extent": {
       "spatial": {
         "bbox": [
